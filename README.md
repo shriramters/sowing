@@ -22,14 +22,16 @@ Simple Org-mode WIki eNGine
 
 1.  **Build the application:**
 
+    Use `make build` to compile the application and prepare web assets. This command will also install Node.js dependencies (like Bootstrap) if they are not already present.
+
     ```bash
-    go build ./cmd/sowing
+    make build
     ```
 
 2.  **Create an initial user and silo:**
 
     ```bash
-    ./sowing admin create-user --username <name> --display-name <display>
+    ./sowing admin create-user --username <name> --display-name <display> --password <password>
     ./sowing admin create-silo --name <name> --slug <slug>
     ```
 

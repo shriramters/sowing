@@ -1,0 +1,8 @@
+{{define "content"}}
+<h1>Silos</h1>
+<ul class="list-group">
+    {{range .Silos}}
+    <li class="list-group-item"><a href="/{{.Slug}}/wiki">{{.Name}}</a></li>
+    {{end}}
+</ul>
+{{end}}

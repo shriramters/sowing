@@ -1,0 +1,7 @@
+{
+  "name": "sowing-web",
+  "private": true,
+  "dependencies": {
+    "bootstrap": "^5.3.7"
+  }
+}
