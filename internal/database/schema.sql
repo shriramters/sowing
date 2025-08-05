@@ -33,6 +33,7 @@ CREATE TABLE pages (
     parent_id INTEGER,
     slug TEXT NOT NULL,
     title TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
     current_revision_id INTEGER NOT NULL,
     archived_at TIMESTAMP,
     FOREIGN KEY(silo_id) REFERENCES silos(id),

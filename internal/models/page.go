@@ -10,7 +10,9 @@ type Page struct {
 	ParentID          *int
 	Slug              string
 	Title             string
+	Position          int // The order of the page within its level
 	CurrentRevisionID int
 	ArchivedAt        *time.Time
 	Children          []*Page
+	Path              string // for convenience, not stored in db, e.g., "servers/web-server"
 }

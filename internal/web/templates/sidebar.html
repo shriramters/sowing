@@ -14,7 +14,8 @@
     {{$node := .Node}}
     {{$root := .Root}}
 
-    <a href="/{{$root.Silo.Slug}}/wiki/{{$node.Slug}}" class="list-group-item list-group-item-action {{if eq $node.ID $root.Page.ID}}active{{end}}">
+    {{/* Use the new .Path field to generate the correct hierarchical URL */}}
+    <a href="/{{$root.Silo.Slug}}/wiki/{{$node.Path}}" class="list-group-item list-group-item-action {{if eq $node.ID $root.Page.ID}}active{{end}}">
         {{$node.Title}}
     </a>
     <!-- If the page has children, render them recursively -->
