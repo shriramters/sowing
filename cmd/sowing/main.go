@@ -14,7 +14,7 @@ import (
 
 type Application struct {
 	DB        *sql.DB
-	Templates *template.Template
+	Templates map[string]*template.Template
 }
 
 func main() {
@@ -38,16 +38,29 @@ func main() {
 		os.Exit(0)
 	}
 
-	templates, err := template.ParseGlob("internal/web/templates/*.html")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Create a map to hold the different, isolated template sets.
+	templates := make(map[string]*template.Template)
+
+	// Create a template set for the index page.
+	templates["index.html"] = template.Must(template.ParseFiles(
+		"internal/web/templates/layout.html",
+		"internal/web/templates/index.html",
+		"internal/web/templates/sidebar.html",
+	))
+
+	// Create a separate template set for the wiki view page.
+	templates["view.html"] = template.Must(template.ParseFiles(
+		"internal/web/templates/layout.html",
+		"internal/web/templates/view.html",
+		"internal/web/templates/sidebar.html",
+	))
 
 	app := &Application{
 		DB:        db,
 		Templates: templates,
 	}
 
+	// Pass the map of templates to the handler.
 	http.HandleFunc("/", web.Homepage(app.DB, app.Templates))
 	http.Handle("/static/", http.StripPrefix("/static/", web.StaticFileServer()))
 

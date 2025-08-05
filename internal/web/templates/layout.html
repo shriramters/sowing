@@ -3,8 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOWING</title>
+    <title>Sowing</title>
     <link href="/static/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles for the push sidebar */
+        body {
+            overflow-x: hidden; /* Prevent horizontal scrollbar */
+        }
+
+        #main-wrapper {
+            display: flex;
+            width: 100%;
+            align-items: stretch;
+        }
+
+        #sidebar {
+            min-width: 250px;
+            max-width: 250px;
+            background: var(--bs-tertiary-bg);
+            color: var(--bs-body-color);
+            transition: all 0.3s;
+            min-height: calc(100vh - 56px); /* Full height minus navbar */
+        }
+
+        #sidebar.collapsed {
+            margin-left: -250px; /* Hide sidebar */
+        }
+
+        #content-wrapper {
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        /* Adjust sidebar content styling */
+        #sidebar .list-group-item {
+            background: transparent;
+            border: none;
+        }
+    </style>
     <script>
         /*!
          * Color mode toggler for Bootstrap's docs (https://getbootstrap.com/)
@@ -53,7 +89,15 @@
 <body>
     <nav class="navbar navbar-expand-lg bg-body-tertiary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">SOWING</a>
+            <!-- Hamburger Button is only shown if .ShowSidebar is true -->
+            {{if .ShowSidebar}}
+            <button class="btn btn-outline-secondary me-2" type="button" id="sidebar-toggle">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-list" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+                </svg>
+            </button>
+            {{end}}
+            <a class="navbar-brand" href="/">Sowing</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -78,12 +122,45 @@
             </div>
         </div>
     </nav>
+
+    <!-- Conditionally render the correct layout structure -->
+    {{if .ShowSidebar}}
+    <div id="main-wrapper">
+        <!-- Sidebar -->
+        <nav id="sidebar">
+            <div class="p-3">
+                <h5>Page Tree</h5>
+                {{template "sidebar" .}}
+            </div>
+        </nav>
+
+        <!-- Page Content Wrapper -->
+        <div id="content-wrapper">
+            <div class="container mt-4">
+                {{template "content" .}}
+            </div>
+        </div>
+    </div>
+    {{else}}
+    <!-- Standard container for pages without a sidebar -->
     <div class="container mt-4">
         {{template "content" .}}
     </div>
+    {{end}}
+
     <script src="/static/bootstrap/bootstrap.bundle.min.js"></script>
+    <script>
+        // Sidebar toggle script
+        document.addEventListener('DOMContentLoaded', function () {
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.getElementById('sidebar');
+
+            if (sidebarToggle && sidebar) {
+                sidebarToggle.addEventListener('click', function () {
+                    sidebar.classList.toggle('collapsed');
+                });
+            }
+        });
+    </script>
 </body>
 </html>
-
-{{define "content"}}
-{{end}}

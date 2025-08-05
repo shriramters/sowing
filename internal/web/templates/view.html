@@ -1,0 +1,23 @@
+{{define "content"}}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Home</a></li>
+        <li class="breadcrumb-item"><a href="/{{.Silo.Slug}}/wiki/home">{{.Silo.Name}}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{.Page.Title}}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center">
+    <h1>{{.Page.Title}}</h1>
+    <div>
+        <a href="#" class="btn btn-primary">Edit</a>
+    </div>
+</div>
+
+
+<hr>
+
+<div>
+    {{.Content}}
+</div>
+{{end}}
