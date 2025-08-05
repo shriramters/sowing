@@ -1,12 +1,29 @@
 {{define "sidebar"}}
-<div class="card">
-    <div class="card-header">
-        Page Tree
-    </div>
-    <ul class="list-group list-group-flush">
-        <!-- Placeholder for page hierarchy -->
-        <li class="list-group-item"><a href="#">Child Page 1</a></li>
-        <li class="list-group-item"><a href="#">Child Page 2</a></li>
-    </ul>
+<div class="list-group list-group-flush">
+    <!-- Start rendering the tree from the root pages -->
+    {{range .SiloPages}}
+        {{/* Pass both the current node and the root data ($) to the template */}}
+        {{template "page-node" (dict "Node" . "Root" $)}}
+    {{end}}
 </div>
+{{end}}
+
+<!-- Recursive template for rendering a single page node in the tree -->
+{{define "page-node"}}
+    {{/* Define variables for easier access to the passed-in data */}}
+    {{$node := .Node}}
+    {{$root := .Root}}
+
+    <a href="/{{$root.Silo.Slug}}/wiki/{{$node.Slug}}" class="list-group-item list-group-item-action {{if eq $node.ID $root.Page.ID}}active{{end}}">
+        {{$node.Title}}
+    </a>
+    <!-- If the page has children, render them recursively -->
+    {{if $node.Children}}
+    <div class="ms-3"> <!-- Indent child pages -->
+        {{range $node.Children}}
+            {{/* Continue passing both the node and the root data down the tree */}}
+            {{template "page-node" (dict "Node" . "Root" $root)}}
+        {{end}}
+    </div>
+    {{end}}
 {{end}}

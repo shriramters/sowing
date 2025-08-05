@@ -35,8 +35,8 @@
             transition: all 0.3s;
         }
 
-        /* Adjust sidebar content styling */
-        #sidebar .list-group-item {
+        /* Adjust sidebar content styling to not interfere with the active state */
+        #sidebar .list-group-item:not(.active) {
             background: transparent;
             border: none;
         }
@@ -91,7 +91,7 @@
         <div class="container-fluid">
             <!-- Hamburger Button is only shown if .ShowSidebar is true -->
             {{if .ShowSidebar}}
-            <button class="btn btn-outline-secondary me-2" type="button" id="sidebar-toggle">
+            <button class="btn btn-outline-secondary me-2" type="button" id="sidebar-toggle" aria-label="Toggle sidebar">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-list" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
                 </svg>

@@ -12,16 +12,39 @@ import (
 )
 
 // PageData is a unified struct to hold all possible data for any page.
-// This ensures that the templates always receive a consistent data structure.
+// SiloPages is now a tree structure instead of a flat list.
 type PageData struct {
 	ShowSidebar bool
 	Silos       []models.Silo
 	Silo        models.Silo
-	Page        models.Page
+	Page        models.Page    // The current page being viewed
+	SiloPages   []*models.Page // The page tree for the sidebar
 	Content     template.HTML
 }
 
-// Homepage now acts as a router. It serves the silo list for the root path
+// buildPageTree takes a flat list of pages and organizes them into a hierarchical tree.
+func buildPageTree(pages []models.Page) []*models.Page {
+	pageMap := make(map[int]*models.Page)
+	for i := range pages {
+		pageMap[pages[i].ID] = &pages[i]
+	}
+
+	var rootPages []*models.Page
+	for _, page := range pages {
+		p := page // Create a new variable to avoid pointer issues in the loop
+		if p.ParentID == nil {
+			rootPages = append(rootPages, pageMap[p.ID])
+		} else {
+			parent, ok := pageMap[*p.ParentID]
+			if ok {
+				parent.Children = append(parent.Children, pageMap[p.ID])
+			}
+		}
+	}
+	return rootPages
+}
+
+// Homepage acts as a router. It serves the silo list for the root path
 // and delegates to the wiki page handler for wiki paths.
 func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
 	wikiPageHandler := viewWikiPage(db, templates)
@@ -123,6 +146,28 @@ func viewWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 			return
 		}
 
+		// Fetch all pages in the current silo to build the tree.
+		rows, err := db.Query("SELECT id, slug, title, parent_id FROM pages WHERE silo_id = ? AND archived_at IS NULL", silo.ID)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		defer rows.Close()
+
+		var allSiloPages []models.Page
+		for rows.Next() {
+			var p models.Page
+			if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.ParentID); err != nil {
+				log.Println(err)
+				http.Error(w, "Internal Server Error", 500)
+				return
+			}
+			allSiloPages = append(allSiloPages, p)
+		}
+
+		pageTree := buildPageTree(allSiloPages)
+
 		htmlContentBytes, err := org.New().Parse(strings.NewReader(revision.Content), "").Write(org.NewHTMLWriter())
 		if err != nil {
 			log.Printf("Error converting org-mode content to HTML: %v", err)
@@ -133,6 +178,7 @@ func viewWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 		data := PageData{
 			Silo:        silo,
 			Page:        page,
+			SiloPages:   pageTree,
 			Content:     template.HTML(htmlContentBytes),
 			ShowSidebar: true,
 		}
@@ -146,5 +192,4 @@ func viewWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 			}
 		}
 	}
-
 }
