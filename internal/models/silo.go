@@ -7,4 +7,5 @@ type Silo struct {
 	Slug       string
 	Name       string
 	ArchivedAt *time.Time
+	CoverImage *string
 }

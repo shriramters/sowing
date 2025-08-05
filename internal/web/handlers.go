@@ -11,7 +11,7 @@ import (
 
 func Homepage(db *sql.DB, templates *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query("SELECT id, slug, name, archived_at FROM silos WHERE archived_at IS NULL")
+		rows, err := db.Query("SELECT id, slug, name, archived_at, cover_image FROM silos WHERE archived_at IS NULL")
 		if err != nil {
 			log.Println(err)
 			http.Error(w, "Internal Server Error", 500)
@@ -22,7 +22,7 @@ func Homepage(db *sql.DB, templates *template.Template) http.HandlerFunc {
 		var silos []models.Silo
 		for rows.Next() {
 			var silo models.Silo
-			if err := rows.Scan(&silo.ID, &silo.Slug, &silo.Name, &silo.ArchivedAt); err != nil {
+			if err := rows.Scan(&silo.ID, &silo.Slug, &silo.Name, &silo.ArchivedAt, &silo.CoverImage); err != nil {
 				log.Println(err)
 				http.Error(w, "Internal Server Error", 500)
 				return

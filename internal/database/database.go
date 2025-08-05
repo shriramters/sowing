@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS silos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     slug TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
-    archived_at TIMESTAMP
+    archived_at TIMESTAMP,
+    cover_image TEXT
 );
 
 -- Users are the authors of content.

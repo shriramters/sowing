@@ -1,8 +1,17 @@
 {{define "content"}}
 <h1>Silos</h1>
-<ul class="list-group">
+<div class="row row-cols-1 row-cols-md-3 g-4">
     {{range .Silos}}
-    <li class="list-group-item"><a href="/{{.Slug}}/wiki">{{.Name}}</a></li>
-    {{end}}
-</ul>
+    <div class="col">
+        <div class="card h-100">
+            {{if .CoverImage}}
+            <img src="{{.CoverImage}}" class="card-img-top" alt="{{.Name}} cover image">
+            {{end}}
+            <div class="card-body">
+                <h5 class="card-title"><a href="/{{.Slug}}/wiki">{{.Name}}</a></h5>
+            </div>
+        </div>
+    </div>
+	{{end}}
+</div>
 {{end}}
