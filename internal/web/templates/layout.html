@@ -8,7 +8,6 @@
     <!-- Link to the local font stylesheet -->
     <link href="/static/fonts/fonts.css" rel="stylesheet">
     <style>
-        /* Custom styles for the push sidebar */
         body {
             overflow-x: hidden; /* Prevent horizontal scrollbar */
         }
@@ -18,18 +17,6 @@
             width: 100%;
             align-items: stretch;
             flex-grow: 1; /* Allow wrapper to fill remaining space */
-        }
-
-        #sidebar {
-            min-width: 250px;
-            max-width: 250px;
-            background: var(--bs-tertiary-bg);
-            color: var(--bs-body-color);
-            transition: all 0.3s;
-        }
-
-        #sidebar.collapsed {
-            margin-left: -250px; /* Hide sidebar */
         }
 
         #content-wrapper {
@@ -45,10 +32,73 @@
             flex-direction: column;
         }
 
-        /* Adjust sidebar content styling to not interfere with the active state */
-        #sidebar .list-group-item:not(.active) {
-            background: transparent;
-            border: none;
+        /* Styles for sidebar*/
+        #sidebar {
+            min-width: 250px;
+            max-width: 250px;
+            background: var(--bs-tertiary-bg);
+            color: var(--bs-body-color);
+            transition: all 0.3s;
+        }
+
+        #sidebar.collapsed {
+            margin-left: -250px; /* Hide sidebar */
+        }
+                
+        .sidebar-tree {
+            margin-top: 1rem;
+        }
+        .tree-nested {
+            padding-left: 1.25rem; /* Indentation for child items */
+        }
+        .tree-item {
+            display: flex;
+            align-items: center;
+            padding: 0.35rem 0.5rem;
+            border-radius: var(--bs-border-radius);
+            text-decoration: none;
+            color: var(--bs-body-color);
+        }
+        .tree-item:hover {
+            background-color: var(--bs-secondary-bg);
+        }
+        .tree-item.active {
+            background-color: var(--bs-primary);
+            color: var(--bs-white);
+        }
+        .tree-page-icon {
+            margin-right: 0.5rem;
+            opacity: 0.7;
+        }
+        .tree-item-title {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+        }
+        .tree-item-actions {
+            display: flex;
+            align-items: center;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+        .tree-item:hover .tree-item-actions,
+        .tree-item.active .tree-item-actions {
+            visibility: visible;
+            opacity: 1;
+        }
+        .action-btn {
+            color: inherit;
+            text-decoration: none;
+            padding: 0.25rem;
+            opacity: 0.7;
+        }
+        .action-btn:hover {
+            opacity: 1;
         }
     </style>
     <script>
@@ -139,7 +189,7 @@
         <!-- Sidebar -->
         <nav id="sidebar">
             <div class="p-3">
-                <h5>Page Tree</h5>
+                <h5>{{.Silo.Name}}</h5>
                 {{template "sidebar" .}}
             </div>
         </nav>

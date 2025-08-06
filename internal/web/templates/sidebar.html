@@ -1,28 +1,71 @@
 {{define "sidebar"}}
-<div class="list-group list-group-flush">
+<div class="p-2 border-bottom">
+    <a href="/{{.Silo.Slug}}/new" class="btn btn-outline-secondary btn-sm w-100 d-flex align-items-center justify-content-center">
+        {{template "icon-new-page"}}
+        New Page
+    </a>
+</div>
+<div class="sidebar-tree">
     <!-- Start rendering the tree from the root pages -->
     {{range .SiloPages}}
-        {{/* Pass both the current node and the root data ($) to the template */}}
         {{template "page-node" (dict "Node" . "Root" $)}}
     {{end}}
 </div>
 {{end}}
 
+{{/* --- Icon Definitions --- */}}
+
+{{define "icon-plus"}}
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg" viewBox="0 0 16 16">
+  <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+</svg>
+{{end}}
+
+{{define "icon-trash"}}
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+  <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+  <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+</svg>
+{{end}}
+
+{{define "icon-file-earmark-text"}}
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-earmark-text" viewBox="0 0 16 16">
+    <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5"/>
+    <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
+</svg>
+{{end}}
+
+{{define "icon-new-page"}}
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg me-1" viewBox="0 0 16 16">
+  <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+</svg>
+{{end}}
+
 <!-- Recursive template for rendering a single page node in the tree -->
 {{define "page-node"}}
-    {{/* Define variables for easier access to the passed-in data */}}
     {{$node := .Node}}
     {{$root := .Root}}
 
-    {{/* Use the new .Path field to generate the correct hierarchical URL */}}
-    <a href="/{{$root.Silo.Slug}}/wiki/{{$node.Path}}" class="list-group-item list-group-item-action {{if eq $node.ID $root.Page.ID}}active{{end}}">
-        {{$node.Title}}
-    </a>
+    <div class="tree-item {{if eq $node.ID $root.Page.ID}}active{{end}}">
+        <span class="tree-page-icon">
+            {{template "icon-file-earmark-text"}}
+        </span>
+        <a href="/{{$root.Silo.Slug}}/wiki/{{$node.Path}}" class="tree-item-title">
+            {{$node.Title}}
+        </a>
+        <div class="tree-item-actions">
+            <a href="/{{$root.Silo.Slug}}/new?parent={{$node.ID}}" class="action-btn" title="Add child page">
+                {{template "icon-plus"}}
+            </a>
+            <a href="#" class="action-btn" title="Delete page">
+                {{template "icon-trash"}}
+            </a>
+        </div>
+    </div>
     <!-- If the page has children, render them recursively -->
     {{if $node.Children}}
-    <div class="ms-3"> <!-- Indent child pages -->
+    <div class="tree-nested"> <!-- Indent child pages -->
         {{range $node.Children}}
-            {{/* Continue passing both the node and the root data down the tree */}}
             {{template "page-node" (dict "Node" . "Root" $root)}}
         {{end}}
     </div>

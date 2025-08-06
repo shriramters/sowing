@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/niklasfasching/go-org/org"
@@ -15,12 +16,14 @@ import (
 // PageData is a unified struct to hold all possible data for any page.
 // SiloPages is now a tree structure instead of a flat list.
 type PageData struct {
-	ShowSidebar bool
-	Silos       []models.Silo
-	Silo        models.Silo
-	Page        models.Page    // The current page being viewed
-	SiloPages   []*models.Page // The page tree for the sidebar
-	Content     template.HTML
+	ShowSidebar  bool
+	Silos        []models.Silo
+	Silo         models.Silo
+	Page         models.Page    // The current page being viewed
+	SiloPages    []*models.Page // The page tree for the sidebar
+	Content      template.HTML
+	AllSiloPages []models.Page // For the parent dropdown on the new page
+	ParentID     int           // The pre-selected parent on the new page
 }
 
 // buildPageTree takes a flat list of pages (already sorted by position)
@@ -96,6 +99,7 @@ func previewHandler(w http.ResponseWriter, r *http.Request) {
 func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
 	wikiPageHandler := viewWikiPage(db, templates)
 	editWikiPageHandler := editWikiPage(db, templates)
+	newWikiPageHandler := newWikiPage(db, templates)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Route for the live preview endpoint.
@@ -141,6 +145,12 @@ func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerF
 					http.Error(w, "Internal Server Error", 500)
 				}
 			}
+			return
+		}
+
+		// Paths like /{silo-slug}/new are for creating a new page.
+		if len(parts) == 2 && parts[1] == "new" {
+			newWikiPageHandler(w, r)
 			return
 		}
 
@@ -352,6 +362,71 @@ func editWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 
 		// Use the "edit.html" template set to execute the layout.
 		err = templates["edit.html"].ExecuteTemplate(w, "layout.html", data)
+		if err != nil {
+			log.Println(err)
+			if w.Header().Get("Content-Type") == "" {
+				http.Error(w, "Internal Server Error", 500)
+			}
+		}
+	}
+}
+
+// newWikiPage handles rendering the form for a new wiki page.
+func newWikiPage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		siloSlug := parts[0]
+
+		var silo models.Silo
+		err := db.QueryRow("SELECT id, slug, name FROM silos WHERE slug = ?", siloSlug).Scan(&silo.ID, &silo.Slug, &silo.Name)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.NotFound(w, r)
+				return
+			}
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		// Fetch all pages in the current silo to build the sidebar and parent dropdown.
+		rows, err := db.Query("SELECT id, slug, title, parent_id, position FROM pages WHERE silo_id = ? AND archived_at IS NULL ORDER BY position ASC", silo.ID)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		defer rows.Close()
+
+		var allSiloPages []models.Page
+		for rows.Next() {
+			var p models.Page
+			if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.ParentID, &p.Position); err != nil {
+				log.Println(err)
+				http.Error(w, "Internal Server Error", 500)
+				return
+			}
+			allSiloPages = append(allSiloPages, p)
+		}
+
+		pageTree := buildPageTree(allSiloPages)
+
+		// Check for a pre-selected parent from the query parameter.
+		parentID := 0
+		parentIDStr := r.URL.Query().Get("parent")
+		if parentIDStr != "" {
+			parentID, _ = strconv.Atoi(parentIDStr)
+		}
+
+		data := PageData{
+			Silo:         silo,
+			SiloPages:    pageTree,
+			AllSiloPages: allSiloPages,
+			ParentID:     parentID,
+			ShowSidebar:  true,
+		}
+
+		err = templates["new.html"].ExecuteTemplate(w, "layout.html", data)
 		if err != nil {
 			log.Println(err)
 			if w.Header().Get("Content-Type") == "" {

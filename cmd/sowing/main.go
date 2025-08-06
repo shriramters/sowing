@@ -83,6 +83,13 @@ func main() {
 		"internal/web/templates/sidebar.html",
 	))
 
+	// Create a template set for the new wiki page.
+	templates["new.html"] = template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+		"internal/web/templates/layout.html",
+		"internal/web/templates/new.html",
+		"internal/web/templates/sidebar.html",
+	))
+
 	app := &Application{
 		DB:        db,
 		Templates: templates,
