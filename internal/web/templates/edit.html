@@ -16,7 +16,7 @@
     </nav>
 
     <!-- The main form, which will be submitted programmatically -->
-    <form method="POST" id="editForm" class="d-flex flex-column flex-grow-1">
+    <form method="POST" id="editForm" class="d-flex flex-column flex-grow-1" action="/{{.Silo.Slug}}/wiki/{{.Page.Path}}/edit">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h1>Editing: {{.Page.Title}}</h1>
             <div>
@@ -28,6 +28,8 @@
             </div>
         </div>
 
+        <hr>
+
         <!-- Nav tabs -->
         <ul class="nav nav-tabs" id="editPreviewTabs" role="tablist">
             <li class="nav-item" role="presentation">
@@ -38,7 +40,7 @@
             </li>
         </ul>
 
-        <!-- Tab panes (borders removed) -->
+        <!-- Tab panes -->
         <div class="tab-content flex-grow-1 d-flex flex-column" id="editPreviewTabContent">
             <div class="tab-pane fade show active h-100" id="edit-pane" role="tabpanel" aria-labelledby="edit-tab" tabindex="0">
                 <div class="flex-grow-1 h-100 pt-3">

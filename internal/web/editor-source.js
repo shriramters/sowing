@@ -175,3 +175,22 @@ if (form) {
 
 // Trigger an initial preview render when the page loads
 updatePreview(textarea.value);
+
+// --- New Page Title-to-Slug Logic ---
+const titleInput = document.querySelector("#title");
+const slugInput = document.querySelector("#slug");
+
+if (titleInput && slugInput) {
+    const slugify = (text) => {
+        return text.toString().toLowerCase()
+            .replace(/\s+/g, '-')           // Replace spaces with -
+            .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
+            .replace(/\-\-+/g, '-')         // Replace multiple - with single -
+            .replace(/^-+/, '')             // Trim - from start of text
+            .replace(/-+$/, '');            // Trim - from end of text
+    };
+
+    titleInput.addEventListener('input', () => {
+        slugInput.value = slugify(titleInput.value);
+    });
+}

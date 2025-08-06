@@ -16,9 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"sowing/internal/models"
-
 	"github.com/niklasfasching/go-org/org"
+	"sowing/internal/models"
 )
 
 // PageData is a unified struct to hold all possible data for any page.
@@ -271,7 +270,9 @@ func uploadHandler(db *sql.DB) http.HandlerFunc {
 func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
 	wikiPageHandler := viewWikiPage(db, templates)
 	editWikiPageHandler := editWikiPage(db, templates)
+	savePageHandler := savePageHandler(db)
 	newWikiPageHandler := newWikiPage(db, templates)
+	createPageHandler := createPageHandler(db)
 	siloCreateHandler := createSiloHandler(db)
 	uploadHandler := uploadHandler(db)
 
@@ -335,13 +336,21 @@ func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerF
 
 		// Paths like /{silo-slug}/new are for creating a new page.
 		if len(parts) == 2 && parts[1] == "new" {
-			newWikiPageHandler(w, r)
+			if r.Method == http.MethodPost {
+				createPageHandler(w, r)
+			} else {
+				newWikiPageHandler(w, r)
+			}
 			return
 		}
 
 		// Paths like /{silo-slug}/wiki/.../edit are handled by the edit page handler.
 		if len(parts) >= 3 && parts[len(parts)-1] == "edit" {
-			editWikiPageHandler(w, r)
+			if r.Method == http.MethodPost {
+				savePageHandler(w, r)
+			} else {
+				editWikiPageHandler(w, r)
+			}
 			return
 		}
 
@@ -618,5 +627,138 @@ func newWikiPage(db *sql.DB, templates map[string]*template.Template) http.Handl
 				http.Error(w, "Internal Server Error", 500)
 			}
 		}
+	}
+}
+
+// createPageHandler handles the POST request for creating a new page.
+func createPageHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		siloSlug := parts[0]
+
+		var silo models.Silo
+		err := db.QueryRow("SELECT id FROM silos WHERE slug = ?", siloSlug).Scan(&silo.ID)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Error parsing form", http.StatusBadRequest)
+			return
+		}
+
+		title := r.PostFormValue("title")
+		slug := r.PostFormValue("slug")
+		content := r.PostFormValue("content")
+		comment := r.PostFormValue("comment")
+		parentID, _ := strconv.Atoi(r.PostFormValue("parent"))
+
+		ctx := context.Background()
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			log.Printf("Error starting transaction: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		defer tx.Rollback()
+
+		var parentIDPtr *int
+		if parentID != 0 {
+			parentIDPtr = &parentID
+		}
+
+		res, err := tx.ExecContext(ctx, "INSERT INTO pages (silo_id, parent_id, slug, title, current_revision_id) VALUES (?, ?, ?, ?, -1)", silo.ID, parentIDPtr, slug, title)
+		if err != nil {
+			log.Printf("Error creating page: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		pageID, _ := res.LastInsertId()
+
+		res, err = tx.ExecContext(ctx, "INSERT INTO revisions (page_id, author_id, comment, content) VALUES (?, 1, ?, ?)", pageID, comment, content)
+		if err != nil {
+			log.Printf("Error creating revision: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		revisionID, _ := res.LastInsertId()
+
+		_, err = tx.ExecContext(ctx, "UPDATE pages SET current_revision_id = ? WHERE id = ?", revisionID, pageID)
+		if err != nil {
+			log.Printf("Error updating page with revision ID: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		if err := tx.Commit(); err != nil {
+			log.Printf("Error committing transaction: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		// This is a simplified redirect. A more robust solution would build the full path.
+		http.Redirect(w, r, fmt.Sprintf("/%s/wiki/%s", siloSlug, slug), http.StatusSeeOther)
+	}
+}
+
+// savePageHandler handles the POST request for editing a page.
+func savePageHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		siloSlug := parts[0]
+		pagePath := parts[2 : len(parts)-1]
+
+		var silo models.Silo
+		err := db.QueryRow("SELECT id FROM silos WHERE slug = ?", siloSlug).Scan(&silo.ID)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		page, err := findPageByPath(db, silo.ID, pagePath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Error parsing form", http.StatusBadRequest)
+			return
+		}
+		content := r.PostFormValue("content")
+		comment := r.PostFormValue("comment")
+
+		ctx := context.Background()
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			log.Printf("Error starting transaction: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		defer tx.Rollback()
+
+		res, err := tx.ExecContext(ctx, "INSERT INTO revisions (page_id, author_id, comment, content) VALUES (?, 1, ?, ?)", page.ID, comment, content)
+		if err != nil {
+			log.Printf("Error creating revision: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		revisionID, _ := res.LastInsertId()
+
+		_, err = tx.ExecContext(ctx, "UPDATE pages SET current_revision_id = ? WHERE id = ?", revisionID, page.ID)
+		if err != nil {
+			log.Printf("Error updating page with revision ID: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		if err := tx.Commit(); err != nil {
+			log.Printf("Error committing transaction: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		http.Redirect(w, r, fmt.Sprintf("/%s/wiki/%s", siloSlug, strings.Join(pagePath, "/")), http.StatusSeeOther)
 	}
 }
