@@ -31,6 +31,8 @@ go.work.sum
 # .idea/
 # .vscode/
 
+# Generated Files
 internal/web/node_modules/
 sowing.db
 sowing
+internal/web/static/editor/bundle.js

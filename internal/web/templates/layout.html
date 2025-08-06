@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="auto">
+<html lang="en" data-bs-theme="auto" class="h-100">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sowing</title>
     <link href="/static/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <!-- Link to the local font stylesheet -->
+    <link href="/static/fonts/fonts.css" rel="stylesheet">
     <style>
         /* Custom styles for the push sidebar */
         body {
@@ -15,6 +17,7 @@
             display: flex;
             width: 100%;
             align-items: stretch;
+            flex-grow: 1; /* Allow wrapper to fill remaining space */
         }
 
         #sidebar {
@@ -23,7 +26,6 @@
             background: var(--bs-tertiary-bg);
             color: var(--bs-body-color);
             transition: all 0.3s;
-            min-height: calc(100vh - 56px); /* Full height minus navbar */
         }
 
         #sidebar.collapsed {
@@ -33,6 +35,14 @@
         #content-wrapper {
             width: 100%;
             transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #content-wrapper > .container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         /* Adjust sidebar content styling to not interfere with the active state */
@@ -86,7 +96,7 @@
         })()
     </script>
 </head>
-<body>
+<body class="d-flex flex-column h-100">
     <nav class="navbar navbar-expand-lg bg-body-tertiary">
         <div class="container-fluid">
             <!-- Hamburger Button is only shown if .ShowSidebar is true -->
@@ -136,7 +146,7 @@
 
         <!-- Page Content Wrapper -->
         <div id="content-wrapper">
-            <div class="container mt-4">
+            <div class="container mt-4 mb-4">
                 {{template "content" .}}
             </div>
         </div>

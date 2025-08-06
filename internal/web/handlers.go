@@ -69,6 +69,7 @@ func buildPageTree(pages []models.Page) []*models.Page {
 // and delegates to the wiki page handler for wiki paths.
 func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
 	wikiPageHandler := viewWikiPage(db, templates)
+	editWikiPageHandler := editWikiPage(db, templates)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
@@ -111,6 +112,12 @@ func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerF
 			return
 		}
 
+		// Paths like /{silo-slug}/wiki/.../edit are handled by the edit page handler.
+		if len(parts) >= 3 && parts[len(parts)-1] == "edit" {
+			editWikiPageHandler(w, r)
+			return
+		}
+
 		// Paths like /{silo-slug}/wiki/... are handled by the wiki page handler.
 		if len(parts) >= 2 && parts[1] == "wiki" {
 			wikiPageHandler(w, r)
@@ -123,6 +130,11 @@ func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerF
 
 // findPageByPath iteratively queries the database to find a page by its hierarchical path.
 func findPageByPath(db *sql.DB, siloID int, path []string) (models.Page, error) {
+	// If the path is empty, no page can be found.
+	if len(path) == 0 {
+		return models.Page{}, sql.ErrNoRows
+	}
+
 	var page models.Page
 	var parentID *int // Starts as NULL for the root page
 
@@ -177,6 +189,8 @@ func viewWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 			http.Error(w, "Internal Server Error", 500)
 			return
 		}
+		// The findPageByPath function doesn't populate the Path field, so we do it here.
+		page.Path = strings.Join(pagePath, "/")
 
 		var revision models.Revision
 		err = db.QueryRow("SELECT content FROM revisions WHERE id = ?", page.CurrentRevisionID).Scan(&revision.Content)
@@ -225,6 +239,87 @@ func viewWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 
 		// Use the "view.html" template set to execute the layout.
 		err = templates["view.html"].ExecuteTemplate(w, "layout.html", data)
+		if err != nil {
+			log.Println(err)
+			if w.Header().Get("Content-Type") == "" {
+				http.Error(w, "Internal Server Error", 500)
+			}
+		}
+	}
+}
+
+// editWikiPage handles rendering the wiki page editor.
+func editWikiPage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		siloSlug := parts[0]
+		pagePath := parts[2 : len(parts)-1] // Exclude the "/edit" part
+
+		var silo models.Silo
+		err := db.QueryRow("SELECT id, slug, name FROM silos WHERE slug = ?", siloSlug).Scan(&silo.ID, &silo.Slug, &silo.Name)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.NotFound(w, r)
+				return
+			}
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		page, err := findPageByPath(db, silo.ID, pagePath)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.NotFound(w, r)
+				return
+			}
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		// The findPageByPath function doesn't populate the Path field, so we do it here.
+		page.Path = strings.Join(pagePath, "/")
+
+		var revision models.Revision
+		err = db.QueryRow("SELECT content FROM revisions WHERE id = ?", page.CurrentRevisionID).Scan(&revision.Content)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		// Fetch all pages in the current silo to build the sidebar tree.
+		rows, err := db.Query("SELECT id, slug, title, parent_id, position FROM pages WHERE silo_id = ? AND archived_at IS NULL ORDER BY position ASC", silo.ID)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		defer rows.Close()
+
+		var allSiloPages []models.Page
+		for rows.Next() {
+			var p models.Page
+			if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.ParentID, &p.Position); err != nil {
+				log.Println(err)
+				http.Error(w, "Internal Server Error", 500)
+				return
+			}
+			allSiloPages = append(allSiloPages, p)
+		}
+
+		pageTree := buildPageTree(allSiloPages)
+
+		data := PageData{
+			Silo:        silo,
+			Page:        page,
+			SiloPages:   pageTree, // Pass the page tree to the template
+			Content:     template.HTML(revision.Content),
+			ShowSidebar: true, // Explicitly enable the sidebar
+		}
+
+		// Use the "edit.html" template set to execute the layout.
+		err = templates["edit.html"].ExecuteTemplate(w, "layout.html", data)
 		if err != nil {
 			log.Println(err)
 			if w.Header().Get("Content-Type") == "" {

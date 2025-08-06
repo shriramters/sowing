@@ -3,5 +3,9 @@
   "private": true,
   "dependencies": {
     "bootstrap": "^5.3.7"
+  },
+  "devDependencies": {
+    "codemirror": "^6.0.2",
+    "esbuild": "^0.25.8"
   }
 }
