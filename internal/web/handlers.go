@@ -396,6 +396,27 @@ func findPageByPath(db *sql.DB, siloID int, path []string) (models.Page, error) 
 	return page, nil
 }
 
+// getPagePathByID recursively finds the full path of a page given its ID.
+func getPagePathByID(db *sql.DB, pageID int) (string, error) {
+	var slug string
+	var parentID sql.NullInt64
+	err := db.QueryRow("SELECT slug, parent_id FROM pages WHERE id = ?", pageID).Scan(&slug, &parentID)
+	if err != nil {
+		return "", err
+	}
+
+	if !parentID.Valid {
+		return slug, nil
+	}
+
+	parentPath, err := getPagePathByID(db, int(parentID.Int64))
+	if err != nil {
+		return "", err
+	}
+
+	return parentPath + "/" + slug, nil
+}
+
 // viewWikiPage handles rendering a single wiki page.
 func viewWikiPage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -697,8 +718,20 @@ func createPageHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// This is a simplified redirect. A more robust solution would build the full path.
-		http.Redirect(w, r, fmt.Sprintf("/%s/wiki/%s", siloSlug, slug), http.StatusSeeOther)
+		var redirectPath string
+		if parentID != 0 {
+			parentPath, err := getPagePathByID(db, parentID)
+			if err != nil {
+				log.Printf("Error getting parent path for redirect: %v", err)
+				http.Error(w, "Internal Server Error", 500)
+				return
+			}
+			redirectPath = parentPath + "/" + slug
+		} else {
+			redirectPath = slug
+		}
+
+		http.Redirect(w, r, fmt.Sprintf("/%s/wiki/%s", siloSlug, redirectPath), http.StatusSeeOther)
 	}
 }
 

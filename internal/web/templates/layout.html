@@ -8,6 +8,28 @@
     <!-- Link to the local font stylesheet -->
     <link href="/static/fonts/fonts.css" rel="stylesheet">
     <style>
+        /* --- Bootstrap Theme Overrides --- */
+        :root {
+            --bs-primary: #198754;
+            --bs-primary-rgb: 25,135,84;
+            --bs-link-color-rgb: 25,135,84;
+            /* A slightly darker green for hover, derived from Bootstrap's success theme */
+            --bs-link-hover-color-rgb: 21, 115, 71; 
+        }
+
+        .btn-primary {
+            --bs-btn-color: #fff;
+            --bs-btn-bg: #198754;
+            --bs-btn-border-color: #198754;
+            --bs-btn-hover-color: #fff;
+            --bs-btn-hover-bg: #157347;
+            --bs-btn-hover-border-color: #146c43;
+            --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+            --bs-btn-active-color: #fff;
+            --bs-btn-active-bg: #146c43;
+            --bs-btn-active-border-color: #13653f;
+        }
+        
         body {
             overflow-x: hidden; /* Prevent horizontal scrollbar */
         }
