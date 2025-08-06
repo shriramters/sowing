@@ -217,6 +217,19 @@
                     </li>
                 </ul>
                 <ul class="navbar-nav">
+                    {{if .IsLoggedIn}}
+                        <li class="nav-item d-flex align-items-center">
+                            <span class="navbar-text me-2">Welcome, {{.CurrentUser.DisplayName}}</span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="btn btn-outline-secondary" href="/logout">Logout</a>
+                        </li>
+                    {{else}}
+                        <li class="nav-item">
+                            <a class="btn btn-outline-primary me-2" href="/login">Login</a>
+                        </li>
+                        
+                    {{end}}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="bd-theme" type="button" aria-expanded="false" data-bs-toggle="dropdown" aria-label="Toggle theme (auto)">
                             Theme

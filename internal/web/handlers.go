@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"sowing/internal/auth"
 	"github.com/niklasfasching/go-org/org"
 	"sowing/internal/models"
 )
@@ -31,6 +32,8 @@ type PageData struct {
 	Content      template.HTML
 	AllSiloPages []models.Page // For the parent dropdown on the new page
 	ParentID     int           // The pre-selected parent on the new page
+	CurrentUser  *models.User
+	IsLoggedIn   bool
 }
 
 // buildPageTree takes a flat list of pages (already sorted by position)
@@ -244,9 +247,9 @@ func uploadHandler(db *sql.DB) http.HandlerFunc {
 
 		// Write the file content to the destination file.
 		if _, err := dst.Write(fileBytes); err != nil {
-			http.Error(w, "Error writing the file", http.StatusInternalServerError)
-			return
-		}
+				http.Error(w, "Error writing the file", http.StatusInternalServerError)
+				return
+			}
 
 		// For now, we won't associate the upload with a page_id.
 		// In the future, you could pass the page_id from the editor.
@@ -265,102 +268,102 @@ func uploadHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// Homepage acts as a router. It serves the silo list for the root path
-// and delegates to the wiki page handler for wiki paths.
-func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
-	wikiPageHandler := viewWikiPage(db, templates)
-	editWikiPageHandler := editWikiPage(db, templates)
-	savePageHandler := savePageHandler(db)
-	newWikiPageHandler := newWikiPage(db, templates)
-	createPageHandler := createPageHandler(db)
-	siloCreateHandler := createSiloHandler(db)
-	uploadHandler := uploadHandler(db)
-
+// loginHandler handles the login page.
+func loginHandler(authService *auth.Service, templates map[string]*template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Route for the live preview endpoint.
-		if r.URL.Path == "/_preview" {
-			previewHandler(w, r)
+		if r.Method == http.MethodPost {
+			username := r.FormValue("username")
+			password := r.FormValue("password")
+			_, err := authService.Login(w, r, username, password)
+			if err != nil {
+				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+				return
+			}
+			http.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
 
-		// Route for the upload endpoint.
-		if r.URL.Path == "/upload" {
-			uploadHandler(w, r)
-			return
+		err := templates["login.html"].ExecuteTemplate(w, "layout.html", nil)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
 		}
+	}
+}
 
-		path := r.URL.Path
-		parts := strings.Split(strings.Trim(path, "/"), "/")
+// logoutHandler handles the logout page.
+func logoutHandler(authService *auth.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authService.Logout(w, r)
+		http.Redirect(w, r, "/", http.StatusFound)
+	}
+}
 
-		// Root path shows the list of silos or handles silo creation.
-		if path == "/" {
-			if r.Method == http.MethodPost {
-				siloCreateHandler(w, r)
+// registerHandler handles the registration page.
+func registerHandler(authService *auth.Service, templates map[string]*template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			username := r.FormValue("username")
+			displayName := r.FormValue("display_name")
+			password := r.FormValue("password")
+
+			_, err := authService.RegisterUser(w, r, username, displayName, password)
+			if err != nil {
+				http.Error(w, "Registration failed", http.StatusInternalServerError)
 				return
 			}
 
-			rows, err := db.Query("SELECT id, slug, name, archived_at, cover_image FROM silos WHERE archived_at IS NULL")
-			if err != nil {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+
+		err := templates["register.html"].ExecuteTemplate(w, "layout.html", nil)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+		}
+	}
+}
+
+// listSilosHandler handles displaying the list of silos (the homepage content).
+func listSilosHandler(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// This handler is only for GET requests to list silos.
+		// POST requests for silo creation are handled by siloCreateHandler.
+		rows, err := db.Query("SELECT id, slug, name, archived_at, cover_image FROM silos WHERE archived_at IS NULL")
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		defer rows.Close()
+
+		var silos []models.Silo
+		for rows.Next() {
+			var silo models.Silo
+			if err := rows.Scan(&silo.ID, &silo.Slug, &silo.Name, &silo.ArchivedAt, &silo.CoverImage); err != nil {
 				log.Println(err)
 				http.Error(w, "Internal Server Error", 500)
 				return
 			}
-			defer rows.Close()
-
-			var silos []models.Silo
-			for rows.Next() {
-				var silo models.Silo
-				if err := rows.Scan(&silo.ID, &silo.Slug, &silo.Name, &silo.ArchivedAt, &silo.CoverImage); err != nil {
-					log.Println(err)
-					http.Error(w, "Internal Server Error", 500)
-					return
-				}
-				silos = append(silos, silo)
-			}
-
-			data := PageData{
-				Silos:       silos,
-				ShowSidebar: false,
-			}
-
-			// Use the "index.html" template set to execute the layout.
-			err = templates["index.html"].ExecuteTemplate(w, "layout.html", data)
-			if err != nil {
-				log.Println(err)
-				if w.Header().Get("Content-Type") == "" {
-					http.Error(w, "Internal Server Error", 500)
-				}
-			}
-			return
+			silos = append(silos, silo)
 		}
 
-		// Paths like /{silo-slug}/new are for creating a new page.
-		if len(parts) == 2 && parts[1] == "new" {
-			if r.Method == http.MethodPost {
-				createPageHandler(w, r)
-			} else {
-				newWikiPageHandler(w, r)
+		user := r.Context().Value("user").(*models.User)
+		data := PageData{
+			Silos:       silos,
+			ShowSidebar: false,
+			CurrentUser: user,
+			IsLoggedIn:  user != nil,
+		}
+
+		err = templates["index.html"].ExecuteTemplate(w, "layout.html", data)
+		if err != nil {
+			log.Println(err)
+			if w.Header().Get("Content-Type") == "" {
+				http.Error(w, "Internal Server Error", 500)
 			}
-			return
 		}
-
-		// Paths like /{silo-slug}/wiki/.../edit are handled by the edit page handler.
-		if len(parts) >= 3 && parts[len(parts)-1] == "edit" {
-			if r.Method == http.MethodPost {
-				savePageHandler(w, r)
-			} else {
-				editWikiPageHandler(w, r)
-			}
-			return
-		}
-
-		// Paths like /{silo-slug}/wiki/... are handled by the wiki page handler.
-		if len(parts) >= 2 && parts[1] == "wiki" {
-			wikiPageHandler(w, r)
-			return
-		}
-
-		http.NotFound(w, r)
 	}
 }
 
@@ -486,12 +489,15 @@ func viewWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 			return
 		}
 
+		user, _ := r.Context().Value("user").(*models.User)
 		data := PageData{
 			Silo:        silo,
 			Page:        page,
 			SiloPages:   pageTree,
 			Content:     template.HTML(htmlContentString),
 			ShowSidebar: true,
+			CurrentUser: user,
+			IsLoggedIn:  user != nil,
 		}
 
 		// Use the "view.html" template set to execute the layout.
@@ -567,12 +573,15 @@ func editWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 
 		pageTree := buildPageTree(allSiloPages)
 
+		user, _ := r.Context().Value("user").(*models.User)
 		data := PageData{
 			Silo:        silo,
 			Page:        page,
 			SiloPages:   pageTree, // Pass the page tree to the template
 			Content:     template.HTML(revision.Content),
 			ShowSidebar: true, // Explicitly enable the sidebar
+			CurrentUser: user,
+			IsLoggedIn:  user != nil,
 		}
 
 		// Use the "edit.html" template set to execute the layout.
@@ -633,12 +642,15 @@ func newWikiPage(db *sql.DB, templates map[string]*template.Template) http.Handl
 			parentID, _ = strconv.Atoi(parentIDStr)
 		}
 
+		user, _ := r.Context().Value("user").(*models.User)
 		data := PageData{
 			Silo:         silo,
 			SiloPages:    pageTree,
 			AllSiloPages: allSiloPages,
 			ParentID:     parentID,
 			ShowSidebar:  true,
+			CurrentUser:  user,
+			IsLoggedIn:   user != nil,
 		}
 
 		err = templates["new.html"].ExecuteTemplate(w, "layout.html", data)
@@ -675,6 +687,12 @@ func createPageHandler(db *sql.DB) http.HandlerFunc {
 		comment := r.PostFormValue("comment")
 		parentID, _ := strconv.Atoi(r.PostFormValue("parent"))
 
+		user, _ := r.Context().Value("user").(*models.User)
+		if user == nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		ctx := context.Background()
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
@@ -697,7 +715,7 @@ func createPageHandler(db *sql.DB) http.HandlerFunc {
 		}
 		pageID, _ := res.LastInsertId()
 
-		res, err = tx.ExecContext(ctx, "INSERT INTO revisions (page_id, author_id, comment, content) VALUES (?, 1, ?, ?)", pageID, comment, content)
+		res, err = tx.ExecContext(ctx, "INSERT INTO revisions (page_id, author_id, comment, content) VALUES (?, ?, ?, ?)", pageID, user.ID, comment, content)
 		if err != nil {
 			log.Printf("Error creating revision: %v", err)
 			http.Error(w, "Internal Server Error", 500)
@@ -762,6 +780,12 @@ func savePageHandler(db *sql.DB) http.HandlerFunc {
 		content := r.PostFormValue("content")
 		comment := r.PostFormValue("comment")
 
+		user, _ := r.Context().Value("user").(*models.User)
+		if user == nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		ctx := context.Background()
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
@@ -771,7 +795,7 @@ func savePageHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		res, err := tx.ExecContext(ctx, "INSERT INTO revisions (page_id, author_id, comment, content) VALUES (?, 1, ?, ?)", page.ID, comment, content)
+		res, err := tx.ExecContext(ctx, "INSERT INTO revisions (page_id, author_id, comment, content) VALUES (?, ?, ?, ?)", page.ID, user.ID, comment, content)
 		if err != nil {
 			log.Printf("Error creating revision: %v", err)
 			http.Error(w, "Internal Server Error", 500)
@@ -794,4 +818,92 @@ func savePageHandler(db *sql.DB) http.HandlerFunc {
 
 		http.Redirect(w, r, fmt.Sprintf("/%s/wiki/%s", siloSlug, strings.Join(pagePath, "/")), http.StatusSeeOther)
 	}
+}
+
+// Homepage sets up the main router with protected and unprotected routes.
+func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
+	authRepo := auth.NewRepository(db)
+	authService := auth.NewService(authRepo)
+
+	// Define all raw (unwrapped) handlers
+	loginH := loginHandler(authService, templates)
+	logoutH := logoutHandler(authService)
+	
+	previewH := previewHandler
+	uploadH := uploadHandler(db)
+	siloCreateH := createSiloHandler(db)
+	listSilosH := listSilosHandler(db, templates)
+	viewWikiPageH := viewWikiPage(db, templates)
+	editWikiPageH := editWikiPage(db, templates)
+	savePageH := savePageHandler(db)
+	newWikiPageH := newWikiPage(db, templates)
+	createPageH := createPageHandler(db)
+
+	// Create a main mux
+	mainMux := http.NewServeMux()
+
+	// Register unprotected routes directly to the main mux
+	mainMux.HandleFunc("/login", loginH)
+	mainMux.HandleFunc("/logout", logoutH)
+	
+
+	// Create a new mux for protected routes
+	protectedMux := http.NewServeMux()
+
+	// Register all protected handlers to the protected mux
+	protectedMux.HandleFunc("/_preview", previewH)
+	protectedMux.HandleFunc("/upload", uploadH)
+	protectedMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		parts := strings.Split(strings.Trim(path, "/"), "/")
+
+		// Handle POST for silo creation on the root path
+		if path == "/" && r.Method == http.MethodPost {
+			siloCreateH.ServeHTTP(w, r)
+			return
+		}
+
+		// Handle GET for listing silos on the root path
+		if path == "/" && r.Method == http.MethodGet {
+			listSilosH.ServeHTTP(w, r)
+			return
+		}
+
+		// Paths like /{silo-slug}/new are for creating a new page.
+		if len(parts) == 2 && parts[1] == "new" {
+			if r.Method == http.MethodPost {
+				createPageH.ServeHTTP(w, r)
+			} else {
+				newWikiPageH.ServeHTTP(w, r)
+			}
+			return
+		}
+
+		// Paths like /{silo-slug}/wiki/.../edit are handled by the edit page handler.
+		if len(parts) >= 3 && parts[len(parts)-1] == "edit" {
+			if r.Method == http.MethodPost {
+				savePageH.ServeHTTP(w, r)
+			} else {
+				editWikiPageH.ServeHTTP(w, r)
+			}
+			return
+		}
+
+		// Paths like /{silo-slug}/wiki/... are handled by the wiki page handler.
+		if len(parts) >= 2 && parts[1] == "wiki" {
+			viewWikiPageH.ServeHTTP(w, r)
+			return
+		}
+
+		http.NotFound(w, r)
+	})
+
+	// Wrap the protected mux with the RequireLogin middleware
+	protectedHandler := authService.RequireLogin(protectedMux)
+
+	// Register the protected handler as the catch-all for the main mux
+	mainMux.Handle("/", protectedHandler)
+
+	// Apply the WithUser middleware as the outermost middleware
+	return authService.WithUser(mainMux).ServeHTTP
 }
