@@ -33,6 +33,11 @@ func main() {
 
 	log.Println("database migrated")
 
+	// Create a directory for file uploads if it doesn't exist.
+	if err := os.MkdirAll("uploads", 0755); err != nil {
+		log.Fatal(err)
+	}
+
 	handleAdminCommands(db)
 
 	if len(flag.Args()) > 0 && flag.Arg(0) == "admin" {
@@ -46,11 +51,11 @@ func main() {
 	// The "dict" function allows passing multiple, named values to a template,
 	// which is perfect for complex or recursive templates.
 	funcMap := template.FuncMap{
-		"dict": func(values ...interface{}) (map[string]interface{}, error) {
+		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, errors.New("invalid dict call")
 			}
-			dict := make(map[string]interface{}, len(values)/2)
+			dict := make(map[string]any, len(values)/2)
 			for i := 0; i < len(values); i += 2 {
 				key, ok := values[i].(string)
 				if !ok {
@@ -95,12 +100,19 @@ func main() {
 		Templates: templates,
 	}
 
-	// Pass the map of templates to the handler.
-	http.HandleFunc("/", web.Homepage(app.DB, app.Templates))
-	http.Handle("/static/", http.StripPrefix("/static/", web.StaticFileServer()))
+	// Create a new ServeMux to explicitly control routing.
+	mux := http.NewServeMux()
+
+	// Register the specific file servers first.
+	mux.Handle("/static/", http.StripPrefix("/static/", web.StaticFileServer()))
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
+
+	// Register the main application handler for all other routes.
+	mux.HandleFunc("/", web.Homepage(app.DB, app.Templates))
 
 	log.Println("starting server on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	// Use the new mux as the handler.
+	if err := http.ListenAndServe(":8080", mux); err != nil {
 		log.Fatal(err)
 	}
 }

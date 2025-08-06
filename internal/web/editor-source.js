@@ -39,10 +39,57 @@ async function updatePreview(docText) {
 
 const debouncedUpdatePreview = debounce(updatePreview, 250);
 
+// --- Upload Logic ---
+function createUploadButton(view) {
+    const button = document.createElement('button');
+    // Use standard button classes and adjust margin
+    button.className = 'btn btn-outline-secondary me-2'; 
+    button.type = 'button'; // Prevent form submission
+    button.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-upload" viewBox="0 0 16 16">
+          <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
+          <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z"/>
+        </svg>
+        Upload File`;
+    button.onclick = (e) => {
+        e.preventDefault();
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = async () => {
+            if (input.files.length === 0) return;
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    // Insert the org-mode link at the current cursor position
+                    const link = `[[${data.url}]]`;
+                    view.dispatch({
+                        changes: {from: view.state.selection.main.head, insert: link}
+                    });
+                } else {
+                    alert('File upload failed.');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('An error occurred during upload.');
+            }
+        };
+        input.click();
+    };
+    return button;
+}
+
 // --- Editor Setup ---
 
 const textarea = document.querySelector("#content");
-const form = document.querySelector("#editForm");
+const form = document.querySelector("form"); // Find the first form on the page
 const finalSaveButton = document.querySelector("#finalSaveButton");
 
 const state = EditorState.create({
@@ -83,7 +130,6 @@ const state = EditorState.create({
                 backgroundColor: "rgba(var(--bs-primary-rgb), 0.2) !important",
             },
         }),
-        // Add a listener that calls the preview function on document changes
         EditorView.updateListener.of(update => {
             if (update.docChanged) {
                 debouncedUpdatePreview(update.state.doc.toString());
@@ -114,6 +160,15 @@ if (finalSaveButton && form) {
         commentInput.value = comment;
         form.submit();
     });
+}
+
+// --- Add Upload Button to the Form Header ---
+if (form) {
+    const header = form.querySelector("h1");
+    if(header) {
+        const button = createUploadButton(view);
+        header.parentElement.querySelector("div").prepend(button);
+    }
 }
 
 // --- Initial Load ---

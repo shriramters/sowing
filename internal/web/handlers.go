@@ -1,16 +1,24 @@
 package web
 
 import (
+	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"fmt"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
+
+	"sowing/internal/models"
 
 	"github.com/niklasfasching/go-org/org"
-	"sowing/internal/models"
 )
 
 // PageData is a unified struct to hold all possible data for any page.
@@ -94,12 +102,178 @@ func previewHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(htmlContentString))
 }
 
+// createSiloHandler handles the creation of a new silo and its initial home page.
+func createSiloHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			http.Error(w, "Error parsing form", http.StatusBadRequest)
+			return
+		}
+		name := r.PostFormValue("name")
+		slug := r.PostFormValue("slug")
+
+		if name == "" || slug == "" {
+			http.Error(w, "Name and slug are required", http.StatusBadRequest)
+			return
+		}
+
+		var coverImageURL *string
+
+		file, handler, err := r.FormFile("cover_image")
+		if err != nil && err != http.ErrMissingFile {
+			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+			return
+		}
+
+		if err != http.ErrMissingFile {
+			defer file.Close()
+			fileBytes, _ := io.ReadAll(file)
+			hash := sha256.Sum256(fileBytes)
+			uniqueFilename := fmt.Sprintf("%s-%d%s", hex.EncodeToString(hash[:16]), time.Now().Unix(), filepath.Ext(handler.Filename))
+
+			dst, err := os.Create(filepath.Join("uploads", uniqueFilename))
+			if err != nil {
+				http.Error(w, "Error saving the file", http.StatusInternalServerError)
+				return
+			}
+			defer dst.Close()
+
+			if _, err := dst.Write(fileBytes); err != nil {
+				http.Error(w, "Error writing the file", http.StatusInternalServerError)
+				return
+			}
+
+			url := "/uploads/" + uniqueFilename
+			coverImageURL = &url
+		}
+
+		// Start a transaction
+		ctx := context.Background()
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			log.Printf("Error starting transaction: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		defer tx.Rollback() // Rollback on error
+
+		// 1. Insert the silo
+		res, err := tx.ExecContext(ctx, "INSERT INTO silos (name, slug, cover_image) VALUES (?, ?, ?)", name, slug, coverImageURL)
+		if err != nil {
+			log.Printf("Error creating silo: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		siloID, _ := res.LastInsertId()
+
+		// 2. Insert the home page (with a temporary revision ID)
+		res, err = tx.ExecContext(ctx, "INSERT INTO pages (silo_id, slug, title, current_revision_id) VALUES (?, 'home', 'Home', -1)", siloID)
+		if err != nil {
+			log.Printf("Error creating home page: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		pageID, _ := res.LastInsertId()
+
+		// 3. Insert the initial revision
+		// Assuming user ID 1 is the default author for now
+		initialContent := fmt.Sprintf("* Welcome to the %s Silo!", name)
+		res, err = tx.ExecContext(ctx, "INSERT INTO revisions (page_id, author_id, comment, content) VALUES (?, 1, 'Initial creation', ?)", pageID, initialContent)
+		if err != nil {
+			log.Printf("Error creating initial revision: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+		revisionID, _ := res.LastInsertId()
+
+		// 4. Update the page with the correct revision ID
+		_, err = tx.ExecContext(ctx, "UPDATE pages SET current_revision_id = ? WHERE id = ?", revisionID, pageID)
+		if err != nil {
+			log.Printf("Error updating page with revision ID: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		// Commit the transaction
+		if err := tx.Commit(); err != nil {
+			log.Printf("Error committing transaction: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+}
+
+// uploadHandler handles file uploads from the editor.
+func uploadHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Parse the multipart form with a 10 MB size limit
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			http.Error(w, "The uploaded file is too big.", http.StatusBadRequest)
+			return
+		}
+
+		file, handler, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Generate a unique filename based on the file's content and the current time
+		// to prevent filename collisions and caching issues.
+		fileBytes, _ := io.ReadAll(file)
+		hash := sha256.Sum256(fileBytes)
+		uniqueFilename := fmt.Sprintf("%s-%d%s",
+			hex.EncodeToString(hash[:16]),
+			time.Now().Unix(),
+			filepath.Ext(handler.Filename))
+
+		// Create the destination file on the server's disk.
+		dst, err := os.Create(filepath.Join("uploads", uniqueFilename))
+		if err != nil {
+			http.Error(w, "Error saving the file", http.StatusInternalServerError)
+			return
+		}
+		defer dst.Close()
+
+		// Write the file content to the destination file.
+		if _, err := dst.Write(fileBytes); err != nil {
+			http.Error(w, "Error writing the file", http.StatusInternalServerError)
+			return
+		}
+
+		// For now, we won't associate the upload with a page_id.
+		// In the future, you could pass the page_id from the editor.
+		_, err = db.Exec(
+			"INSERT INTO attachments (filename, unique_filename, mime_type, size) VALUES (?, ?, ?, ?)",
+			handler.Filename, uniqueFilename, handler.Header.Get("Content-Type"), handler.Size)
+		if err != nil {
+			log.Printf("Error saving attachment to database: %v", err)
+			http.Error(w, "Error saving file metadata", http.StatusInternalServerError)
+			return
+		}
+
+		// Return the URL of the uploaded file as a JSON response.
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"url": "/uploads/%s"}`, uniqueFilename)
+	}
+}
+
 // Homepage acts as a router. It serves the silo list for the root path
 // and delegates to the wiki page handler for wiki paths.
 func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
 	wikiPageHandler := viewWikiPage(db, templates)
 	editWikiPageHandler := editWikiPage(db, templates)
 	newWikiPageHandler := newWikiPage(db, templates)
+	siloCreateHandler := createSiloHandler(db)
+	uploadHandler := uploadHandler(db)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Route for the live preview endpoint.
@@ -108,11 +282,22 @@ func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerF
 			return
 		}
 
+		// Route for the upload endpoint.
+		if r.URL.Path == "/upload" {
+			uploadHandler(w, r)
+			return
+		}
+
 		path := r.URL.Path
 		parts := strings.Split(strings.Trim(path, "/"), "/")
 
-		// Root path shows the list of silos.
+		// Root path shows the list of silos or handles silo creation.
 		if path == "/" {
+			if r.Method == http.MethodPost {
+				siloCreateHandler(w, r)
+				return
+			}
+
 			rows, err := db.Query("SELECT id, slug, name, archived_at, cover_image FROM silos WHERE archived_at IS NULL")
 			if err != nil {
 				log.Println(err)

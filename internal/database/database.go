@@ -74,6 +74,18 @@ CREATE TABLE IF NOT EXISTS revisions (
     FOREIGN KEY(page_id) REFERENCES pages(id),
     FOREIGN KEY(author_id) REFERENCES users(id)
 );
+
+-- Attachments are files uploaded by users.
+CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    page_id INTEGER,
+    filename TEXT NOT NULL,
+    unique_filename TEXT UNIQUE NOT NULL,
+    mime_type TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(page_id) REFERENCES pages(id)
+);
 `)
 	return err
 }
