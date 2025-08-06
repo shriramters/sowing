@@ -49,6 +49,17 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Get session key from environment variable
+	sessionKey := os.Getenv("SOWING_SESSION_KEY")
+	if sessionKey == "" {
+		log.Fatal("SOWING_SESSION_KEY environment variable not set")
+	}
+
+	// Initialize the session store
+	if err := auth.InitSessionStore(sessionKey); err != nil {
+		log.Fatal(err)
+	}
+
 	// Create a map to hold the different, isolated template sets.
 	templates := make(map[string]*template.Template)
 
@@ -134,6 +145,8 @@ func main() {
 	if err := http.ListenAndServe(":8080", mux); err != nil {
 		log.Fatal(err)
 	}
+
+	
 }
 func handleAdminCommands(db *sql.DB) {
 	args := flag.Args()

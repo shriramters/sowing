@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"net/http"
+	
 
 	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
@@ -12,7 +13,18 @@ import (
 )
 
 // Store will hold the session store.
-var Store = sessions.NewCookieStore([]byte("something-very-secret"))
+var Store *sessions.CookieStore
+
+func InitSessionStore(sessionKey string) error {
+	if len(sessionKey) < 32 {
+		return errors.New("session key must be at least 32 characters long")
+	}
+	Store = sessions.NewCookieStore([]byte(sessionKey))
+	Store.Options.HttpOnly = true
+	Store.Options.Path = "/"
+	Store.Options.SameSite = http.SameSiteLaxMode // Protect against CSRF
+	return nil
+}
 
 func init() {
 	gob.Register(&models.User{})
@@ -88,6 +100,11 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request, username, passwo
 
 	session, _ := Store.Get(r, "sowing-session")
 	session.Values["user"] = user
+
+	// Set Secure flag based on request scheme or X-Forwarded-Proto header
+	// This is crucial for correct behavior behind reverse proxies.
+	session.Options.Secure = r.URL.Scheme == "https" || r.Header.Get("X-Forwarded-Proto") == "https"
+
 	session.Save(r, w)
 
 	return user, nil
@@ -97,6 +114,10 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request, username, passwo
 func (s *Service) Logout(w http.ResponseWriter, r *http.Request) {
 	session, _ := Store.Get(r, "sowing-session")
 	delete(session.Values, "user")
+
+	// Ensure Secure flag is set correctly for logout cookie as well
+	session.Options.Secure = r.URL.Scheme == "https" || r.Header.Get("X-Forwarded-Proto") == "https"
+
 	session.Save(r, w)
 }
 
