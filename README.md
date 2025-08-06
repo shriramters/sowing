@@ -4,7 +4,8 @@ Simple Org-mode WIki eNGine
 
 **WORK IN PROGRESS, DO NOT USE UNTIL A TAGGED RELEASE IS AVAILABLE**
 
-<img width="1921" height="1080" alt="image" src="https://github.com/user-attachments/assets/495277e8-769e-4983-a919-05f06b5654e2" />
+<img width="720" alt="sowing-alpha-screenshot" src="https://github.com/user-attachments/assets/433e149a-50b2-4819-a36e-9e1b26c5b967" />
+
 
 ## Features
 
