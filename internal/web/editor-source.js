@@ -1,26 +1,63 @@
 import { EditorView, basicSetup } from "codemirror"
 import { EditorState } from "@codemirror/state"
 
+// --- Preview Logic ---
+
+// Debounce function to limit how often the preview is updated
+let debounceTimer;
+function debounce(func, timeout = 300){
+  return (...args) => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => { func.apply(this, args); }, timeout);
+  };
+}
+
+// Function to fetch and render the preview
+async function updatePreview(docText) {
+    const previewPane = document.querySelector("#preview-content");
+    if (!previewPane) return;
+
+    try {
+        const response = await fetch('/_preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain; charset=utf-8',
+            },
+            body: docText
+        });
+        if (response.ok) {
+            const html = await response.text();
+            previewPane.innerHTML = html;
+        } else {
+            previewPane.innerHTML = '<div class="alert alert-danger">Error loading preview.</div>';
+        }
+    } catch (error) {
+        console.error('Preview Error:', error);
+        previewPane.innerHTML = '<div class="alert alert-danger">Could not connect to server for preview.</div>';
+    }
+}
+
+const debouncedUpdatePreview = debounce(updatePreview, 250);
+
+// --- Editor Setup ---
+
 const textarea = document.querySelector("#content");
-const form = document.querySelector("#editForm"); // Get form by ID
+const form = document.querySelector("#editForm");
 const finalSaveButton = document.querySelector("#finalSaveButton");
 
-// Create the editor state with the content from the textarea
 const state = EditorState.create({
     doc: textarea.value,
     extensions: [
         basicSetup,
-        // A more modern theme that integrates with Bootstrap's CSS variables
         EditorView.theme({
             "&": {
                 color: "var(--bs-body-color)",
                 backgroundColor: "var(--bs-body-bg)",
-                height: "100%", // Fill the parent container
+                height: "100%",
             },
-            // Apply the font directly to the scrollable content area
             ".cm-scroller": {
                 fontFamily: "'JetBrains Mono', monospace",
-                overflow: "auto" // Ensure scroller is always present
+                overflow: "auto"
             },
             ".cm-content": {
                 caretColor: "var(--bs-body-color)"
@@ -29,15 +66,13 @@ const state = EditorState.create({
                 outline: "0",
             },
             ".cm-gutters": {
-                backgroundColor: "transparent", // Gutter now blends with the editor background
+                backgroundColor: "transparent",
                 color: "var(--bs-secondary-color)",
-                border: "none" // No right-side border on the gutter
+                border: "none"
             },
-            // Style the cursor to be visible in both light and dark modes
             ".cm-cursor, .cm-dropCursor": {
                 borderLeftColor: "var(--bs-body-color)"
             },
-            // Remove the active line highlight
             ".cm-activeLineGutter": {
                 backgroundColor: "transparent"
             },
@@ -47,31 +82,28 @@ const state = EditorState.create({
             "& .cm-selectionBackground, ::selection": {
                 backgroundColor: "rgba(var(--bs-primary-rgb), 0.2) !important",
             },
+        }),
+        // Add a listener that calls the preview function on document changes
+        EditorView.updateListener.of(update => {
+            if (update.docChanged) {
+                debouncedUpdatePreview(update.state.doc.toString());
+            }
         })
     ]
 });
 
-// The parent for the editor is now the div wrapping the textarea
 const editorParent = textarea.parentElement;
-
 const view = new EditorView({
     state,
     parent: editorParent
 });
 
-// Hide the original textarea so the user only sees the editor
-textarea.style.display = "none";
+// --- Form Submission Logic ---
 
-// Listen for the final save button click in the modal
 if (finalSaveButton && form) {
     finalSaveButton.addEventListener('click', () => {
-        // 1. Update the hidden textarea with the editor's content
         textarea.value = view.state.doc.toString();
-
-        // 2. Get the comment from the modal's input
         const comment = document.querySelector("#modalComment").value;
-
-        // 3. Create a hidden input for the comment and add it to the form
         let commentInput = form.querySelector('input[name="comment"]');
         if (!commentInput) {
             commentInput = document.createElement('input');
@@ -80,8 +112,11 @@ if (finalSaveButton && form) {
             form.appendChild(commentInput);
         }
         commentInput.value = comment;
-
-        // 4. Submit the form
         form.submit();
     });
 }
+
+// --- Initial Load ---
+
+// Trigger an initial preview render when the page loads
+updatePreview(textarea.value);

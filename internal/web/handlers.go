@@ -3,6 +3,7 @@ package web
 import (
 	"database/sql"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -65,6 +66,31 @@ func buildPageTree(pages []models.Page) []*models.Page {
 	return rootPages
 }
 
+// previewHandler takes raw org-mode text and returns the rendered HTML.
+func previewHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+
+	htmlContentString, err := org.New().Parse(strings.NewReader(string(body)), "").Write(org.NewHTMLWriter())
+	if err != nil {
+		log.Printf("Error converting org-mode content to HTML: %v", err)
+		http.Error(w, "Internal Server Error", 500)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(htmlContentString))
+}
+
 // Homepage acts as a router. It serves the silo list for the root path
 // and delegates to the wiki page handler for wiki paths.
 func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
@@ -72,6 +98,12 @@ func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerF
 	editWikiPageHandler := editWikiPage(db, templates)
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Route for the live preview endpoint.
+		if r.URL.Path == "/_preview" {
+			previewHandler(w, r)
+			return
+		}
+
 		path := r.URL.Path
 		parts := strings.Split(strings.Trim(path, "/"), "/")
 
@@ -222,7 +254,7 @@ func viewWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 
 		pageTree := buildPageTree(allSiloPages)
 
-		htmlContentBytes, err := org.New().Parse(strings.NewReader(revision.Content), "").Write(org.NewHTMLWriter())
+		htmlContentString, err := org.New().Parse(strings.NewReader(revision.Content), "").Write(org.NewHTMLWriter())
 		if err != nil {
 			log.Printf("Error converting org-mode content to HTML: %v", err)
 			http.Error(w, "Internal Server Error", 500)
@@ -233,7 +265,7 @@ func viewWikiPage(db *sql.DB, templates map[string]*template.Template) http.Hand
 			Silo:        silo,
 			Page:        page,
 			SiloPages:   pageTree,
-			Content:     template.HTML(htmlContentBytes),
+			Content:     template.HTML(htmlContentString),
 			ShowSidebar: true,
 		}
 
