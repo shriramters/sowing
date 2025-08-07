@@ -11,6 +11,43 @@
         {{template "page-node" (dict "Node" . "Root" $)}}
     {{end}}
 </div>
+
+<!-- Delete Page Modal -->
+<div class="modal fade" id="deletePageModal" tabindex="-1" aria-labelledby="deletePageModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="deletePageForm" action="" method="POST">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="deletePageModalLabel">Delete Page</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete the page "<strong id="deletePageName"></strong>"?</p>
+          <p class="text-muted">This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+    const deletePageModal = document.getElementById('deletePageModal');
+    if (deletePageModal) {
+        deletePageModal.addEventListener('show.bs.modal', event => {
+            const button = event.relatedTarget;
+            const pagePath = button.getAttribute('data-page-path');
+            const pageTitle = button.getAttribute('data-page-title');
+            const form = deletePageModal.querySelector('#deletePageForm');
+            const pageName = deletePageModal.querySelector('#deletePageName');
+            form.action = pagePath;
+            pageName.textContent = pageTitle;
+        });
+    }
+</script>
 {{end}}
 
 {{/* --- Icon Definitions --- */}}
@@ -57,7 +94,7 @@
             <a href="/{{$root.Silo.Slug}}/new?parent={{$node.ID}}" class="action-btn" title="Add child page">
                 {{template "icon-plus"}}
             </a>
-            <a href="#" class="action-btn" title="Delete page">
+            <a href="#" class="action-btn" data-bs-toggle="modal" data-bs-target="#deletePageModal" data-page-path="/{{$root.Silo.Slug}}/wiki/{{$node.Path}}/delete" data-page-title="{{$node.Title}}" title="Delete page">
                 {{template "icon-trash"}}
             </a>
         </div>

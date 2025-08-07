@@ -820,6 +820,40 @@ func savePageHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+// deletePageHandler handles the POST request for deleting a page.
+func deletePageHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		siloSlug := parts[0]
+		pagePath := parts[2 : len(parts)-1] // Exclude "/delete"
+
+		var silo models.Silo
+		err := db.QueryRow("SELECT id FROM silos WHERE slug = ?", siloSlug).Scan(&silo.ID)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		page, err := findPageByPath(db, silo.ID, pagePath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		// For simplicity, we'll just mark the page as archived.
+		// A more robust solution would handle child pages (e.g., re-parenting or deleting them).
+		_, err = db.Exec("UPDATE pages SET archived_at = ? WHERE id = ?", time.Now(), page.ID)
+		if err != nil {
+			log.Printf("Error archiving page: %v", err)
+			http.Error(w, "Internal Server Error", 500)
+			return
+		}
+
+		// Redirect to the silo's home page after deletion.
+		http.Redirect(w, r, fmt.Sprintf("/%s/wiki/home", siloSlug), http.StatusSeeOther)
+	}
+}
+
 // Homepage sets up the main router with protected and unprotected routes.
 func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerFunc {
 	authRepo := auth.NewRepository(db)
@@ -838,6 +872,7 @@ func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerF
 	savePageH := savePageHandler(db)
 	newWikiPageH := newWikiPage(db, templates)
 	createPageH := createPageHandler(db)
+	deletePageH := deletePageHandler(db)
 
 	// Create a main mux
 	mainMux := http.NewServeMux()
@@ -875,6 +910,17 @@ func Homepage(db *sql.DB, templates map[string]*template.Template) http.HandlerF
 				createPageH.ServeHTTP(w, r)
 			} else {
 				newWikiPageH.ServeHTTP(w, r)
+			}
+			return
+		}
+
+		// Paths like /{silo-slug}/wiki/.../delete are for deleting a page.
+		if len(parts) >= 4 && parts[len(parts)-1] == "delete" {
+			if r.Method == http.MethodPost {
+				deletePageH.ServeHTTP(w, r)
+			} else {
+				// Or handle with a specific error/page if GET is not supported
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			}
 			return
 		}
