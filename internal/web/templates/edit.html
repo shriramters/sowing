@@ -19,7 +19,7 @@
     <form method="POST" id="editForm" class="d-flex flex-column flex-grow-1" action="/{{.Silo.Slug}}/wiki/{{.Page.Path}}/edit">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h1>Editing: {{.Page.Title}}</h1>
-            <div>
+            <div class="page-action-buttons">
                 <a href="/{{.Silo.Slug}}/wiki/{{.Page.Path}}" class="btn btn-secondary">Cancel</a>
                 <!-- This button now triggers the modal instead of submitting the form -->
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#saveModal">

@@ -86,111 +86,106 @@ function createUploadButton(view) {
     return button;
 }
 
-// --- Editor Setup ---
+document.addEventListener('DOMContentLoaded', () => {
+    const textarea = document.querySelector("#content");
+    const form = document.querySelector("#newPageForm, #editForm");
+    const finalSaveButton = document.querySelector("#finalSaveButton");
 
-const textarea = document.querySelector("#content");
-const form = document.querySelector("form"); // Find the first form on the page
-const finalSaveButton = document.querySelector("#finalSaveButton");
-
-const state = EditorState.create({
-    doc: textarea.value,
-    extensions: [
-        basicSetup,
-        EditorView.theme({
-            "&": {
-                color: "var(--bs-body-color)",
-                backgroundColor: "var(--bs-body-bg)",
-                height: "100%",
-            },
-            ".cm-scroller": {
-                fontFamily: "'JetBrains Mono', monospace",
-                overflow: "auto"
-            },
-            ".cm-content": {
-                caretColor: "var(--bs-body-color)"
-            },
-            "&.cm-focused": {
-                outline: "0",
-            },
-            ".cm-gutters": {
-                backgroundColor: "transparent",
-                color: "var(--bs-secondary-color)",
-                border: "none"
-            },
-            ".cm-cursor, .cm-dropCursor": {
-                borderLeftColor: "var(--bs-body-color)"
-            },
-            ".cm-activeLineGutter": {
-                backgroundColor: "transparent"
-            },
-            ".cm-activeLine": {
-                backgroundColor: "transparent"
-            },
-            "& .cm-selectionBackground, ::selection": {
-                backgroundColor: "rgba(var(--bs-primary-rgb), 0.2) !important",
-            },
-        }),
-        EditorView.updateListener.of(update => {
-            if (update.docChanged) {
-                debouncedUpdatePreview(update.state.doc.toString());
-            }
-        })
-    ]
-});
-
-const editorParent = textarea.parentElement;
-const view = new EditorView({
-    state,
-    parent: editorParent
-});
-
-// --- Form Submission Logic ---
-
-if (finalSaveButton && form) {
-    finalSaveButton.addEventListener('click', () => {
-        textarea.value = view.state.doc.toString();
-        const comment = document.querySelector("#modalComment").value;
-        let commentInput = form.querySelector('input[name="comment"]');
-        if (!commentInput) {
-            commentInput = document.createElement('input');
-            commentInput.type = 'hidden';
-            commentInput.name = 'comment';
-            form.appendChild(commentInput);
-        }
-        commentInput.value = comment;
-        form.submit();
-    });
-}
-
-// --- Add Upload Button to the Form Header ---
-if (form) {
-    const header = form.querySelector("h1");
-    if(header) {
-        const button = createUploadButton(view);
-        header.parentElement.querySelector("div").prepend(button);
+    if (!form) {
+        return;
     }
-}
 
-// --- Initial Load ---
-
-// Trigger an initial preview render when the page loads
-updatePreview(textarea.value);
-
-// --- New Page Title-to-Slug Logic ---
-const titleInput = document.querySelector("#title");
-const slugInput = document.querySelector("#slug");
-
-if (titleInput && slugInput) {
-    const slugify = (text) => {
-        return text.toString().toLowerCase()
-            .replace(/\s+/g, '-')           // Replace spaces with -
-            .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
-            .replace(/\-\-+/g, '-')         // Replace multiple - with single -
-            .replace(/^-+/, '')             // Trim - from start of text
-            .replace(/-+$/, '');            // Trim - from end of text
-    };
-
-    titleInput.addEventListener('input', () => {
-        slugInput.value = slugify(titleInput.value);
+    const state = EditorState.create({
+        doc: textarea.value,
+        extensions: [
+            basicSetup,
+            EditorView.theme({
+                "&": {
+                    color: "var(--bs-body-color)",
+                    backgroundColor: "var(--bs-body-bg)",
+                    height: "100%",
+                },
+                ".cm-scroller": {
+                    fontFamily: "'JetBrains Mono', monospace",
+                    overflow: "auto"
+                },
+                ".cm-content": {
+                    caretColor: "var(--bs-body-color)"
+                },
+                "&.cm-focused": {
+                    outline: "0",
+                },
+                ".cm-gutters": {
+                    backgroundColor: "transparent",
+                    color: "var(--bs-secondary-color)",
+                    border: "none"
+                },
+                ".cm-cursor, .cm-dropCursor": {
+                    borderLeftColor: "var(--bs-body-color)"
+                },
+                ".cm-activeLineGutter": {
+                    backgroundColor: "transparent"
+                },
+                ".cm-activeLine": {
+                    backgroundColor: "transparent"
+                },
+                "& .cm-selectionBackground, ::selection": {
+                    backgroundColor: "rgba(var(--bs-primary-rgb), 0.2) !important",
+                },
+            }),
+            EditorView.updateListener.of(update => {
+                if (update.docChanged) {
+                    debouncedUpdatePreview(update.state.doc.toString());
+                }
+            })
+        ]
     });
-}
+
+    const editorParent = textarea.parentElement;
+    const view = new EditorView({
+        state,
+        parent: editorParent
+    });
+
+    const buttonContainer = form.querySelector(".page-action-buttons");
+    if(buttonContainer) {
+        const button = createUploadButton(view);
+        buttonContainer.prepend(button);
+    }
+
+    if (finalSaveButton && form) {
+        finalSaveButton.addEventListener('click', () => {
+            textarea.value = view.state.doc.toString();
+            const comment = document.querySelector("#modalComment").value;
+            let commentInput = form.querySelector('input[name="comment"');
+            if (!commentInput) {
+                commentInput = document.createElement('input');
+                commentInput.type = 'hidden';
+                commentInput.name = 'comment';
+                form.appendChild(commentInput);
+            }
+            commentInput.value = comment;
+            form.submit();
+        });
+    }
+
+    updatePreview(textarea.value);
+
+    const titleInput = document.querySelector("#title");
+    const slugInput = document.querySelector("#slug");
+
+    if (titleInput && slugInput) {
+        const slugify = (text) => {
+            return text.toString().toLowerCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^\w\-]+/g, '')
+                .replace(/\-\-+/g, '-')
+                .replace(/^-+/, '')
+                .replace(/-+$/, '');
+        };
+
+        titleInput.addEventListener('input', () => {
+            slugInput.value = slugify(titleInput.value);
+        });
+    }
+});
