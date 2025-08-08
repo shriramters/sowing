@@ -94,7 +94,7 @@
             <a href="/{{$root.Silo.Slug}}/new?parent={{$node.ID}}" class="action-btn" title="Add child page">
                 {{template "icon-plus"}}
             </a>
-            <a href="#" class="action-btn" data-bs-toggle="modal" data-bs-target="#deletePageModal" data-page-path="/{{$root.Silo.Slug}}/wiki/{{$node.Path}}/delete" data-page-title="{{$node.Title}}" title="Delete page">
+            <a href="#" class="action-btn" data-bs-toggle="modal" data-bs-target="#deletePageModal" data-page-path="/{{$root.Silo.Slug}}/delete/{{$node.Path}}" data-page-title="{{$node.Title}}" title="Delete page">
                 {{template "icon-trash"}}
             </a>
         </div>

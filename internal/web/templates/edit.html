@@ -16,7 +16,7 @@
     </nav>
 
     <!-- The main form, which will be submitted programmatically -->
-    <form method="POST" id="editForm" class="d-flex flex-column flex-grow-1" action="/{{.Silo.Slug}}/wiki/{{.Page.Path}}/edit">
+    <form method="POST" id="editForm" class="d-flex flex-column flex-grow-1" action="/{{.Silo.Slug}}/edit/{{.Page.Path}}">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h1>Editing: {{.Page.Title}}</h1>
             <div class="page-action-buttons">

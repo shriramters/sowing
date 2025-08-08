@@ -18,10 +18,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type Application struct {
-	DB        *sql.DB
-	Templates map[string]*template.Template
-}
+
 
 func main() {
 	var dsn = flag.String("dsn", "sowing.db", "The database connection string.")
@@ -125,24 +122,9 @@ func main() {
 		"internal/web/templates/sidebar.html",
 	))
 
-	app := &Application{
-		DB:        db,
-		Templates: templates,
-	}
+	server := web.NewServer(db, templates)
 
-	// Create a new ServeMux to explicitly control routing.
-	mux := http.NewServeMux()
-
-	// Register the specific file servers first.
-	mux.Handle("/static/", http.StripPrefix("/static/", web.StaticFileServer()))
-	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
-
-	// Register the main application handler for all other routes.
-	mux.HandleFunc("/", web.Homepage(app.DB, app.Templates))
-
-	log.Println("starting server on :8080")
-	// Use the new mux as the handler.
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	if err := http.ListenAndServe(":8080", server); err != nil {
 		log.Fatal(err)
 	}
 
