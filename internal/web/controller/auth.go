@@ -27,7 +27,6 @@ func (a *Auth) loginGet(w http.ResponseWriter, r *http.Request) {
 	err := a.Templates["login.html"].ExecuteTemplate(w, "layout.html", nil)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Internal Server Error", 500)
 	}
 }
 
@@ -51,7 +50,6 @@ func (a *Auth) registerGet(w http.ResponseWriter, r *http.Request) {
 	err := a.Templates["register.html"].ExecuteTemplate(w, "layout.html", nil)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Internal Server Error", 500)
 	}
 }
 

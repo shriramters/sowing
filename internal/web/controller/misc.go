@@ -2,7 +2,6 @@ package controller
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -10,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sowing/internal/attachment"
+	"sowing/internal/models"
 	"strings"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 
 // Misc provides miscellaneous handlers
 type Misc struct {
-	DB *sql.DB
+	AttachmentRepo *attachment.Repository
 }
 
 // Register registers the misc routes
@@ -74,13 +75,17 @@ func (m *Misc) upload(w http.ResponseWriter, r *http.Request) {
 	defer dst.Close()
 
 	if _, err := dst.Write(fileBytes); err != nil {
-			http.Error(w, "Error writing the file", http.StatusInternalServerError)
-			return
-		}
+		http.Error(w, "Error writing the file", http.StatusInternalServerError)
+		return
+	}
 
-	_, err = m.DB.Exec(
-		"INSERT INTO attachments (filename, unique_filename, mime_type, size) VALUES (?, ?, ?, ?)",
-		handler.Filename, uniqueFilename, handler.Header.Get("Content-Type"), handler.Size)
+	attachment := &models.Attachment{
+		Filename:       handler.Filename,
+		UniqueFilename: uniqueFilename,
+		MimeType:       handler.Header.Get("Content-Type"),
+		Size:           handler.Size,
+	}
+	err = m.AttachmentRepo.Create(attachment)
 	if err != nil {
 		log.Printf("Error saving attachment to database: %v", err)
 		http.Error(w, "Error saving file metadata", http.StatusInternalServerError)

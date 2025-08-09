@@ -16,13 +16,13 @@ func (s *Server) routes() http.Handler {
 	authController.Register(mux)
 
 	authenticatedMux := http.NewServeMux()
-	siloController := controller.Silo{DB: s.db, Templates: s.templates}
+	siloController := controller.Silo{SiloRepo: s.siloRepo, Templates: s.templates}
 	siloController.Register(authenticatedMux)
 
-	pageController := controller.Page{DB: s.db, Templates: s.templates}
+	pageController := controller.Page{PageRepo: s.pageRepo, SiloRepo: s.siloRepo, Templates: s.templates}
 	pageController.Register(authenticatedMux)
 
-	miscController := controller.Misc{DB: s.db}
+	miscController := controller.Misc{AttachmentRepo: s.attachmentRepo}
 	miscController.Register(authenticatedMux)
 
 	mux.Handle("/", middleware.WithUser(s.authService)(middleware.Auth(s.authService)(authenticatedMux)))
