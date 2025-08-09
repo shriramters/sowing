@@ -13,12 +13,11 @@ import (
 	"sowing/internal/auth"
 	"sowing/internal/database"
 	"sowing/internal/models"
+	"sowing/internal/silo"
 	"sowing/internal/web"
 
 	"golang.org/x/crypto/bcrypt"
 )
-
-
 
 func main() {
 	var dsn = flag.String("dsn", "sowing.db", "The database connection string.")
@@ -85,6 +84,7 @@ func main() {
 		"internal/web/templates/layout.html",
 		"internal/web/templates/index.html",
 		"internal/web/templates/sidebar.html",
+		"internal/web/templates/navbar.html",
 	))
 
 	// Create a separate template set for the wiki view page, also with the FuncMap.
@@ -92,6 +92,7 @@ func main() {
 		"internal/web/templates/layout.html",
 		"internal/web/templates/view.html",
 		"internal/web/templates/sidebar.html",
+		"internal/web/templates/navbar.html",
 	))
 
 	// Create a template set for the wiki edit page.
@@ -99,6 +100,7 @@ func main() {
 		"internal/web/templates/layout.html",
 		"internal/web/templates/edit.html",
 		"internal/web/templates/sidebar.html",
+		"internal/web/templates/navbar.html",
 	))
 
 	// Create a template set for the new wiki page.
@@ -106,6 +108,7 @@ func main() {
 		"internal/web/templates/layout.html",
 		"internal/web/templates/new.html",
 		"internal/web/templates/sidebar.html",
+		"internal/web/templates/navbar.html",
 	))
 
 	// Create a template set for the login page.
@@ -113,6 +116,7 @@ func main() {
 		"internal/web/templates/layout.html",
 		"internal/web/templates/login.html",
 		"internal/web/templates/sidebar.html",
+		"internal/web/templates/navbar.html",
 	))
 
 	// Create a template set for the register page.
@@ -120,6 +124,7 @@ func main() {
 		"internal/web/templates/layout.html",
 		"internal/web/templates/register.html",
 		"internal/web/templates/sidebar.html",
+		"internal/web/templates/navbar.html",
 	))
 
 	server := web.NewServer(db, templates)
@@ -128,7 +133,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	
 }
 func handleAdminCommands(db *sql.DB) {
 	args := flag.Args()
@@ -191,7 +195,8 @@ func handleAdminCommands(db *sql.DB) {
 			os.Exit(1)
 		}
 
-		_, err := db.Exec("INSERT INTO silos (name, slug) VALUES (?, ?)", *name, *slug)
+		siloRepo := silo.NewRepository(db)
+		err := siloRepo.Create(*name, *slug, nil)
 		if err != nil {
 			log.Fatalf("Error creating silo: %v", err)
 		}

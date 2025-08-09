@@ -24,7 +24,7 @@ type Misc struct {
 
 // Register registers the misc routes
 func (m *Misc) Register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /_preview", m.preview)
+	mux.HandleFunc("POST /preview", m.preview)
 	mux.HandleFunc("POST /upload", m.upload)
 }
 

@@ -18,7 +18,7 @@ async function updatePreview(docText) {
     if (!previewPane) return;
 
     try {
-        const response = await fetch('/_preview', {
+        const response = await fetch('/preview', {
             method: 'POST',
             headers: {
                 'Content-Type': 'text/plain; charset=utf-8',
