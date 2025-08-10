@@ -225,3 +225,8 @@ code.verbatim {
   display: inline;
   margin: 0;
 }
+
+/* New rule for no-transition */
+#sidebar.no-transition {
+    transition: none !important;
+}
