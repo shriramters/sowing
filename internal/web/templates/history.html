@@ -1,0 +1,39 @@
+{{define "content"}}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Home</a></li>
+        <li class="breadcrumb-item"><a href="/{{.Silo.Slug}}/wiki/home">{{.Silo.Name}}</a></li>
+        <li class="breadcrumb-item"><a href="/{{.Silo.Slug}}/wiki/{{.Page.Path}}">{{.Page.Title}}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">History</li>
+    </ol>
+</nav>
+
+<h1>{{.Page.Title}} History</h1>
+
+<form id="diffForm" action="/{{.Silo.Slug}}/diff/{{.Page.Path}}" method="GET">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Compare</th>
+                <th>Date</th>
+                <th>Author</th>
+                <th>Comment</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Revisions}}
+            <tr>
+                <td>
+                    <input type="radio" name="from" value="{{.ID}}">
+                    <input type="radio" name="to" value="{{.ID}}">
+                </td>
+                <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+                <td>{{.Author}}</td>
+                <td>{{.Comment}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    <button type="submit" class="btn btn-primary">Compare Revisions</button>
+</form>
+{{end}}

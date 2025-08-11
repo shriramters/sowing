@@ -6,6 +6,7 @@ require (
 	github.com/gorilla/sessions v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.30
 	github.com/niklasfasching/go-org v1.9.1
+	github.com/sergi/go-diff v1.4.0
 	golang.org/x/crypto v0.40.0
 )
 

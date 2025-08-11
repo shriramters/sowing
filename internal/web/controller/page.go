@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"html/template"
@@ -15,6 +16,7 @@ import (
 	"sowing/internal/web/viewmodels"
 
 	"github.com/niklasfasching/go-org/org"
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 // Page provides page handlers
@@ -32,6 +34,147 @@ func (p *Page) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /{siloSlug}/edit/{pagePath...}", p.edit)
 	mux.HandleFunc("POST /{siloSlug}/edit/{pagePath...}", p.save)
 	mux.HandleFunc("POST /{siloSlug}/delete/{pagePath...}", p.delete)
+	mux.HandleFunc("GET /{siloSlug}/diff/{pagePath...}", p.diff)
+	mux.HandleFunc("GET /{siloSlug}/history/{pagePath...}", p.history)
+}
+
+func (p *Page) history(w http.ResponseWriter, r *http.Request) {
+	siloSlug := r.PathValue("siloSlug")
+	pagePath := r.PathValue("pagePath")
+
+	silo, err := p.SiloRepo.FindBySlug(siloSlug)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	page, err := p.PageRepo.FindByPath(silo.ID, strings.Split(pagePath, "/"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	page.Path = pagePath
+
+	allSiloPages, err := p.PageRepo.ListBySilo(silo.ID)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Internal Server Error", 500)
+		return
+	}
+	pageTree := buildPageTree(allSiloPages)
+
+	revisions, err := p.PageRepo.ListRevisionsByPage(page.ID)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Internal Server Error", 500)
+		return
+	}
+
+	user, _ := r.Context().Value("user").(*models.User)
+	data := viewmodels.PageData{
+		Silo:        *silo,
+		Page:        page,
+		Revisions:   revisions,
+		SiloPages:   pageTree,
+		ShowSidebar: true,
+		CurrentUser: user,
+		IsLoggedIn:  user != nil,
+	}
+
+	err = p.Templates["history.html"].ExecuteTemplate(w, "layout.html", data)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func (p *Page) diff(w http.ResponseWriter, r *http.Request) {
+	siloSlug := r.PathValue("siloSlug")
+	pagePath := r.PathValue("pagePath")
+	from := r.URL.Query().Get("from")
+	to := r.URL.Query().Get("to")
+
+	fromID, err := strconv.Atoi(from)
+	if err != nil {
+		http.Error(w, "Invalid 'from' revision", http.StatusBadRequest)
+		return
+	}
+
+	toID, err := strconv.Atoi(to)
+	if err != nil {
+		http.Error(w, "Invalid 'to' revision", http.StatusBadRequest)
+		return
+	}
+
+	silo, err := p.SiloRepo.FindBySlug(siloSlug)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	page, err := p.PageRepo.FindByPath(silo.ID, strings.Split(pagePath, "/"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	page.Path = pagePath
+
+	allSiloPages, err := p.PageRepo.ListBySilo(silo.ID)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Internal Server Error", 500)
+		return
+	}
+	pageTree := buildPageTree(allSiloPages)
+
+	fromContent, err := p.PageRepo.GetRevisionContent(fromID)
+	if err != nil {
+		http.Error(w, "Could not find 'from' revision", http.StatusInternalServerError)
+		return
+	}
+
+	toContent, err := p.PageRepo.GetRevisionContent(toID)
+	if err != nil {
+		http.Error(w, "Could not find 'to' revision", http.StatusInternalServerError)
+		return
+	}
+
+	dmp := diffmatchpatch.New()
+	diffs := dmp.DiffMain(fromContent, toContent, true)
+	diffs = dmp.DiffCleanupSemantic(diffs)
+
+	var buff bytes.Buffer
+	for _, diff := range diffs {
+		switch diff.Type {
+		case diffmatchpatch.DiffInsert:
+			buff.WriteString("<ins>")
+			buff.WriteString(diff.Text)
+			buff.WriteString("</ins>")
+		case diffmatchpatch.DiffDelete:
+			buff.WriteString("<del>")
+			buff.WriteString(diff.Text)
+			buff.WriteString("</del>")
+		case diffmatchpatch.DiffEqual:
+			buff.WriteString("<span>")
+			buff.WriteString(diff.Text)
+			buff.WriteString("</span>")
+		}
+	}
+
+	user, _ := r.Context().Value("user").(*models.User)
+	data := viewmodels.PageData{
+		Silo:        *silo,
+		Page:        page,
+		Content:     template.HTML(buff.String()),
+		SiloPages:   pageTree,
+		ShowSidebar: true,
+		CurrentUser: user,
+		IsLoggedIn:  user != nil,
+	}
+
+	err = p.Templates["diff.html"].ExecuteTemplate(w, "layout.html", data)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func (p *Page) view(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +218,13 @@ func (p *Page) view(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	revisions, err := p.PageRepo.ListRevisionsByPage(page.ID)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Internal Server Error", 500)
+		return
+	}
+
 	pageTree := buildPageTree(allSiloPages)
 
 	htmlContentString, err := org.New().Parse(strings.NewReader(content), "").Write(org.NewHTMLWriter())
@@ -88,6 +238,7 @@ func (p *Page) view(w http.ResponseWriter, r *http.Request) {
 	data := viewmodels.PageData{
 		Silo:        *silo,
 		Page:        page,
+		Revisions:   revisions,
 		SiloPages:   pageTree,
 		Content:     template.HTML(htmlContentString),
 		ShowSidebar: true,

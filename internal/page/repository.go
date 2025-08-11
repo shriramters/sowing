@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sowing/internal/models"
+	"sowing/internal/web/viewmodels"
 	"time"
 )
 
@@ -158,4 +159,33 @@ func (r *Repository) CreateRevision(ctx context.Context, revision *models.Revisi
 func (r *Repository) Delete(pageID int) error {
 	_, err := r.DB.Exec("UPDATE pages SET archived_at = ? WHERE id = ?", time.Now(), pageID)
 	return err
+}
+
+// ListRevisionsByPage lists all revisions for a given page.
+func (r *Repository) ListRevisionsByPage(pageID int) ([]viewmodels.RevisionViewModel, error) {
+	rows, err := r.DB.Query(`
+		SELECT r.id, r.created_at, r.comment, u.display_name
+		FROM revisions r
+		JOIN users u ON r.author_id = u.id
+		WHERE r.page_id = ?
+		ORDER BY r.created_at DESC
+	`, pageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var revisions []viewmodels.RevisionViewModel
+	for rows.Next() {
+		var revision viewmodels.RevisionViewModel
+		var comment sql.NullString
+		if err := rows.Scan(&revision.ID, &revision.CreatedAt, &comment, &revision.Author); err != nil {
+			return nil, err
+		}
+		if comment.Valid {
+			revision.Comment = &comment.String
+		}
+		revisions = append(revisions, revision)
+	}
+	return revisions, nil
 }

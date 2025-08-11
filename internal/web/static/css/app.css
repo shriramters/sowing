@@ -139,6 +139,16 @@ body {
 }
 
 /* --- Title as Input Styles --- */
+ins {
+    background-color: var(--bs-success-bg-subtle);
+    text-decoration: none;
+}
+
+del {
+    background-color: var(--bs-danger-bg-subtle);
+    text-decoration: none;
+}
+
 .title-input {
     font-size: var(--bs-heading-font-size, 2.5rem); /* Match h1 font size */
     font-weight: 500;
@@ -148,10 +158,17 @@ body {
     padding: 0;
     box-shadow: none !important; /* Remove focus glow */
 }
+
 .title-input:focus {
     border: none;
     background-color: transparent;
 }
+
+.diff-view {
+    white-space: pre-wrap;
+    font-family: var(--bs-font-monospace);
+}
+
 /* Org export styling */
 [id^="outline-container-"] {
   margin-bottom: 1.5rem;  /* Reduced from 2rem */

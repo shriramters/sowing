@@ -1,0 +1,18 @@
+{{define "content"}}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Home</a></li>
+        <li class="breadcrumb-item"><a href="/{{.Silo.Slug}}/wiki/home">{{.Silo.Name}}</a></li>
+        <li class="breadcrumb-item"><a href="/{{.Silo.Slug}}/wiki/{{.Page.Path}}">{{.Page.Title}}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Comparing Revisions</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center">
+    <h1>Comparing Revisions for {{.Page.Title}}</h1>
+</div>
+
+<hr>
+
+<pre class="diff-view">{{.Content}}</pre>
+{{end}}

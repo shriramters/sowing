@@ -127,6 +127,22 @@ func main() {
 		"internal/web/templates/navbar.html",
 	))
 
+	// Create a template set for the history page.
+	templates["history.html"] = template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+		"internal/web/templates/layout.html",
+		"internal/web/templates/history.html",
+		"internal/web/templates/sidebar.html",
+		"internal/web/templates/navbar.html",
+	))
+
+	// Create a template set for the diff page.
+	templates["diff.html"] = template.Must(template.New("layout.html").Funcs(funcMap).ParseFiles(
+		"internal/web/templates/layout.html",
+		"internal/web/templates/diff.html",
+		"internal/web/templates/sidebar.html",
+		"internal/web/templates/navbar.html",
+	))
+
 	server := web.NewServer(db, templates)
 
 	if err := http.ListenAndServe(":8080", server); err != nil {
