@@ -11,6 +11,8 @@ require (
 )
 
 require (
+	github.com/alecthomas/chroma/v2 v2.20.0 // indirect
+	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	golang.org/x/net v0.41.0 // indirect
 )

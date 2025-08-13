@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sowing/internal/attachment"
 	"sowing/internal/models"
+	"sowing/internal/web/renderer"
 	"strings"
 	"time"
 
@@ -36,7 +37,7 @@ func (m *Misc) preview(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	htmlContentString, err := org.New().Parse(strings.NewReader(string(body)), "").Write(org.NewHTMLWriter())
+	htmlContentString, err := org.New().Parse(strings.NewReader(string(body)), "").Write(renderer.NewHTMLWriterWithChroma())
 	if err != nil {
 		log.Printf("Error converting org-mode content to HTML: %v", err)
 		http.Error(w, "Internal Server Error", 500)

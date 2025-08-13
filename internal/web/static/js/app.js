@@ -25,6 +25,17 @@
         } else {
             document.documentElement.setAttribute('data-bs-theme', theme)
         }
+
+        const lightTheme = document.getElementById('chroma-light-theme');
+        const darkTheme = document.getElementById('chroma-dark-theme');
+
+        if (theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            lightTheme.disabled = true;
+            darkTheme.disabled = false;
+        } else {
+            lightTheme.disabled = false;
+            darkTheme.disabled = true;
+        }
     }
 
     setTheme(getPreferredTheme())

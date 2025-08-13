@@ -8,12 +8,12 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
-
 	"sowing/internal/models"
 	"sowing/internal/page"
 	"sowing/internal/silo"
+	"sowing/internal/web/renderer"
 	"sowing/internal/web/viewmodels"
+	"strings"
 
 	"github.com/niklasfasching/go-org/org"
 	"github.com/sergi/go-diff/diffmatchpatch"
@@ -227,7 +227,7 @@ func (p *Page) view(w http.ResponseWriter, r *http.Request) {
 
 	pageTree := buildPageTree(allSiloPages)
 
-	htmlContentString, err := org.New().Parse(strings.NewReader(content), "").Write(org.NewHTMLWriter())
+	htmlContentString, err := org.New().Parse(strings.NewReader(content), "").Write(renderer.NewHTMLWriterWithChroma())
 	if err != nil {
 		log.Printf("Error converting org-mode content to HTML: %v", err)
 		http.Error(w, "Internal Server Error", 500)
